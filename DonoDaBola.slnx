@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="DonoDaBola.Core.Tests/DonoDaBola.Core.Tests.csproj" />
+  <Project Path="DonoDaBola.Core/DonoDaBola.Core.csproj" />
+  <Project Path="DonoDaBola.Game/DonoDaBola.Game.csproj" />
+  <Project Path="DonoDaBola.Windows/DonoDaBola.Windows.csproj" DefaultStartup="true" />
+</Solution>

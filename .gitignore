@@ -1,0 +1,20 @@
+# Build (.NET / Stride)
+[Bb]in/
+[Oo]bj/
+TestResults/
+
+# Caches da Stride
+Cache/
+*.sdpkg.user
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.userprefs
+
+# Diversos
+*.log
+Thumbs.db
