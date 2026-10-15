@@ -23,4 +23,14 @@ public static class TestPlayers
         Physical = new() { Pace = rating, Stamina = rating, Strength = rating, Agility = rating },
         Goalkeeping = new() { Reflexes = rating, Positioning = rating, RushingOut = rating, Kicking = rating },
     };
+
+    // Clube com 18 jogadores de mesma nota: 2 goleiros, 6 defensores, 6 meio-campistas e 4 atacantes.
+    public static Club CreateClub(string id, int rating = 10)
+    {
+        var squad = new List<Player>();
+        foreach (var (position, count) in new[] { (Position.Goalkeeper, 2), (Position.Defender, 6), (Position.Midfielder, 6), (Position.Forward, 4) })
+            for (var i = 0; i < count; i++)
+                squad.Add(Create($"{id}-{position}-{i}", position, rating));
+        return new Club { Id = id, Name = $"Clube {id}", ShortName = id.ToUpperInvariant(), Squad = squad };
+    }
 }
