@@ -2,12 +2,13 @@
 
 ## Onde estou
 
-Marco **M1 – Uma partida**.
+Marco **M1 – Uma partida**: minha parte está concluída e na `main`. O marco do grupo fecha com a narração na Stride (Mateus) e os clubes em JSON (Renan).
 
 | Entrega | Situação |
 |---|---|
-| PR 1 – Modelos (`Player`, `Club`, atributos) | PR aberto: [#1](https://github.com/hugo-v-a/DonoDaBola/pull/1) |
-| PR 2 – Escalação 4-4-2 e motor de eventos | PR aberto: [#2](https://github.com/hugo-v-a/DonoDaBola/pull/2) (mesclar depois do #1) |
+| PR 1 – Modelos (`Player`, `Club`, atributos) | na `main` ([#1](https://github.com/hugo-v-a/DonoDaBola/pull/1)) |
+| PR 2 – Escalação 4-4-2 e motor de eventos | na `main` ([#2](https://github.com/hugo-v-a/DonoDaBola/pull/2)) |
+| CI – testes do Core no GitHub Actions | na `main` ([#3](https://github.com/hugo-v-a/DonoDaBola/pull/3)) |
 
 ## Como usar
 
@@ -78,16 +79,17 @@ Cada `MatchEvent` tem `Minute`, `Type` (`Goal`, `Save`, `Miss`), `Club` (quem fi
 - Moral, condição física, contrato e finanças **ainda não existem** nos modelos (M2+).
 - **Partida em 90 intervalos de 1 minuto**, sem acréscimos. Só há eventos de finalização (gol, defesa, fora); intervalo (45') e fim (90') a interface deduz. Sem assistências por enquanto.
 - **Escalação 4-4-2 fixa** com os melhores de cada posição; se faltar gente numa posição, entra o melhor restante nessa função. Elenco com menos de 11 lança `ArgumentException`.
+- **CI:** todo PR roda `dotnet test DonoDaBola.Core.Tests` no GitHub Actions (check `core-tests`). Os projetos da Stride não são compilados no CI; compilem localmente antes de abrir o PR.
 - **Calibração atual** (times de nota 10, 1.000 jogos): 2,46 gols e 11,3 finalizações por jogo; mandante vence 37%, empate 28%, visitante 35%. Nota 15 × nota 8: o forte vence 90%. As constantes ficam no topo do `MatchEngine`; ajuste fino no M4.
 
 ## Dependências
 
 - **Renan pode usar agora:** `Player`, `Club`, `Position`, `Rating` e o formato JSON acima. No carregador, use `new JsonSerializerOptions { RespectNullableAnnotations = true }`, para que um `null` no arquivo (ex.: `"Name": null`) seja rejeitado.
-- **Mateus pode usar agora:** os modelos para dados falsos na tela de Elenco e, com o PR 2, `MatchEngine.Simulate` e os eventos para a tela de narração. O texto da narração fica na interface; o Core só entrega os dados.
+- **Mateus pode usar agora:** os modelos para dados falsos na tela de Elenco e `MatchEngine.Simulate` com os eventos para a tela de narração. O texto da narração fica na interface; o Core só entrega os dados.
 - **Preciso do Renan:** os 20 clubes genéricos em JSON nesse formato, para testar a simulação com dados de verdade.
 
 ## Próximos passos
 
-1. Revisar e mesclar os PRs 1 e 2 com o grupo.
+1. Fechar o M1 com o grupo: integrar a simulação à tela de narração do Mateus, usando os clubes em JSON do Renan.
 2. M2: simular as rodadas dos outros clubes; cartões, lesões, moral e condição física.
 3. M4: calibrar com médias reais do Brasileirão (gols por jogo, porcentagem de vitórias do mandante), junto com o Renan.
