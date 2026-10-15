@@ -6,7 +6,7 @@ Marco **M1 – Uma partida**.
 
 | Entrega | Situação |
 |---|---|
-| PR 1 – Modelos (`Player`, `Club`, atributos) | PR aberto: _link no PR_ |
+| PR 1 – Modelos (`Player`, `Club`, atributos) | PR aberto: [#1](https://github.com/hugo-v-a/DonoDaBola/pull/1) |
 | PR 2 – Escalação 4-4-2 e motor de eventos | em andamento (`feature/simulacao`) |
 
 ## Como usar
