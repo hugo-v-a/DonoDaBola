@@ -13,11 +13,17 @@ Queremos jogadores com idade, altura, peso, pé preferido e nacionalidade realis
 - **Cobertura no recorte histórico:** nascimento 98–99%, posição 95–97%, nacionalidade 97–98%, altura 33–36%, peso 17–18%, pé preferido 0%.
 
 ## Decisão
-- O Wikidata é usado **só como amostra estatística**. A ferramenta `tools/DonoDaBola.SeedBuilder`, rodada à mão e fora do jogo, consulta jogadores que passaram pelos clubes da Série A 2026 e nasceram entre 1990 e 2008. Ela grava em `data/player-stats.json` só agregados por posição: idade, altura, peso, proporção de nacionalidades e tamanho da amostra.
+- O Wikidata é usado **só como amostra estatística**. A ferramenta `tools/DonoDaBola.SeedBuilder`, rodada à mão e fora do jogo, consulta jogadores que passaram pelos clubes da Série A 2026 e nasceram entre 1985 e 2008. Ela grava em `data/player-stats.json` só agregados por posição: altura, peso, proporção de nacionalidades e tamanho da amostra.
 - **Todos os jogadores do seed são gerados com seed** a partir dessas distribuições, com nomes brasileiros fictícios e `DataSource = Generated`. O pé preferido segue uma proporção fixa do gerador (cerca de 75% direito, 20% esquerdo e 5% ambos), porque o Wikidata não tem esse dado.
 - O seed publicado (`data/seed.json`) e o `player-stats.json` **não contêm nomes reais nem IDs do Wikidata**. Um teste automatizado garante isso.
 - O valor `DataSource = Wikidata` fica reservado para quem carregar dados reais por arquivo editável (GDD §10).
 - O jogo nunca acessa a internet.
+
+**Atualização na implementação (21/10/2026):** a idade também não sai do Wikidata.
+- **Idade calculada para 2026:** os nascidos entre 1985 e 2008 concentram-se nos anos 1990, e a média ficaria perto de 31 anos.
+- **Idade no início do vínculo (P580):** a média sai 20,8 anos, porque o primeiro vínculo registrado costuma ser o da base.
+- **Decisão:** a idade do elenco virou parâmetro fixo do gerador (média 26, desvio 4,5, goleiros +1,5). É um valor aproximado, sem fonte, a calibrar no M4.
+- **Amostra:** uma única consulta com os 20 clubes, agrupada por jogador e sem projetar identificadores, trouxe 2.740 jogadores. Altura: cerca de 67%; peso: cerca de 36%; nacionalidade: 99%.
 
 ## Alternativas consideradas
 - **Elenco real de cada clube como molde:** inviável, porque o elenco atual não é identificável pelo Wikidata. Também aumentaria o risco de identificar pessoas reais.

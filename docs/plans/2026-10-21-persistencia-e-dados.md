@@ -212,7 +212,7 @@ O banco é o save. O `game.db` é a partida em andamento; cada slot é uma cópi
 
 ## 8. Gerador e SeedBuilder (PR B)
 
-- **`player-stats.json`:** produzido pelo `SeedBuilder stats`. São agregados por posição: idade (média e desvio-padrão), altura e peso (média e desvio-padrão), proporção de nacionalidades e tamanho da amostra. Não contém nomes, IDs ou indivíduos.
+- **`player-stats.json`:** produzido pelo `SeedBuilder stats`. São agregados por posição: altura e peso (média e desvio-padrão), proporção de nacionalidades e tamanho da amostra. **Mudou na implementação:** a idade virou parâmetro do gerador, porque o Wikidata não dá a idade do elenco atual (ADR 0003). Não contém nomes, IDs ou indivíduos.
   - **Amostra:** jogadores (P106 = futebolista) com P54 em algum dos 20 clubes da Série A 2026, nascidos entre 1990 e 2008.
   - **Posição:** P413 mapeada para as quatro posições.
   - **Consultas:** uma por clube, em sequência. User-Agent `DonoDaBolaSeedBuilder/<versão> (https://github.com/hugo-v-a/DonoDaBola)`; em caso de `429`, respeita o `Retry-After`; timeout de 60 s.

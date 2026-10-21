@@ -10,6 +10,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="DonoDaBola.Data.Tests" />
+    <!-- Seed publicado (gerado por tools/DonoDaBola.SeedBuilder), embutido para não depender de caminho de arquivo. -->
+    <EmbeddedResource Include="..\data\seed.json" LogicalName="DonoDaBola.Data.seed.json" />
   </ItemGroup>
 
   <PropertyGroup>

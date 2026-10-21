@@ -4,7 +4,7 @@
 
 Desde 21/10/2026 cuido também da frente **Dados e competição**, que era do Renan, com a autorização dele (marcos M1 a M4). Mudança de direção pedida pelo professor: os dados vão para um banco **SQLite**, e o jogo passa a ser pensado para **celular** (ADRs em `docs/decisoes/`).
 
-Marco **M1 – Uma partida**: simulação pronta na `main`. Faltam a persistência (PR A) e os 20 clubes genéricos (PR B); o marco fecha com a narração na Stride (Mateus).
+Marco **M1 – Uma partida**: simulação pronta na `main`. Persistência (PR A) e 20 clubes genéricos (PR B) estão em PR. Depois do merge, o M1 fecha com a narração na Stride (Mateus).
 
 | Entrega | Situação |
 |---|---|
@@ -12,7 +12,7 @@ Marco **M1 – Uma partida**: simulação pronta na `main`. Faltam a persistênc
 | PR 2 – Escalação 4-4-2 e motor de eventos | na `main` ([#2](https://github.com/hugo-v-a/DonoDaBola/pull/2)) |
 | CI – testes do Core no GitHub Actions | na `main` ([#3](https://github.com/hugo-v-a/DonoDaBola/pull/3)) |
 | PR A – Persistência SQLite, perfil do jogador, seed e saves | PR aberto: [#5](https://github.com/hugo-v-a/DonoDaBola/pull/5) |
-| PR B – Gerador, SeedBuilder e 20 clubes genéricos | a seguir (`feature/dados-iniciais`) |
+| PR B – Gerador, SeedBuilder e 20 clubes genéricos | PR aberto: [#6](https://github.com/hugo-v-a/DonoDaBola/pull/6) (base: PR A) |
 
 ## Como usar
 
@@ -44,7 +44,7 @@ using DonoDaBola.Data;
 var folder = Stride.Core.IO.VirtualFileSystem.ApplicationLocal.GetAbsolutePath("");
 using var db = GameDatabase.OpenInDirectory(folder);
 if (db.IsEmpty)
-    SeedImporter.Import(db, File.OpenRead("seed.json")); // no PR B o seed vem embutido; até lá, use um arquivo de teste
+    SeedImporter.ImportDefault(db); // 20 clubes genéricos, embutidos no Data (PR B)
 
 IClubRepository clubs = db;
 IPlayerRepository players = db;
@@ -128,7 +128,9 @@ Cada `MatchEvent` tem `Minute`, `Type` (`Goal`, `Save`, `Miss`), `Club` (quem fi
 - **Idade nunca é guardada:** só a data de nascimento; `AgeOn(data)` calcula a idade. Em ano não bissexto, quem nasceu em 29/02 faz aniversário em 28/02.
 - **Banco SQLite é a fonte de verdade e o save** (ADR 0001). O seed em JSON tem o formato `{ "Clubs": [...], "Version": 1 }` e só é importado num banco vazio. A importação recusa versão errada, elenco sem 4-4-2 natural (1 GOL, 4 DEF, 4 MEI, 2 ATA) e campos nulos.
 - **Portabilidade mobile** (ADR 0002): as regras valem para todos e estão no CLAUDE.md e no template de PR.
-- **Dados dos jogadores** (ADR 0003): o Wikidata entra só como amostra estatística; todos os jogadores do seed são gerados, com nomes fictícios.
+- **Dados dos jogadores** (ADR 0003): o Wikidata entra só como amostra estatística de altura, peso e nacionalidade (2.740 jogadores). Todos os jogadores do seed são gerados, com nomes fictícios. A idade do elenco (média 26) e o pé preferido (75% destros) são parâmetros do gerador.
+- **20 clubes genéricos** (`data/seed.json`): nomes fictícios (ex.: Esporte Clube Serra Verde, `SVE`), ids `clu01`…`clu20` e jogadores `clu01-p01`… Os níveis vão de 15 (favoritos) a 8 (candidatos ao rebaixamento). Cada elenco tem 28 jogadores: 3 GOL, 9 DEF, 10 MEI e 6 ATA.
+- **Regerar os dados** (só se mudar o gerador): `dotnet run --project tools/DonoDaBola.SeedBuilder -- seed`. Com `-- stats`, consulta o Wikidata de novo. Mesma seed, mesmo arquivo; um teste confere isso.
 - **Aleatoriedade:** sem interface própria. Quem precisar de sorteio recebe um `System.Random` criado com seed (`new Random(42)`); mesma seed, mesma sequência. Vale também para o gerador de atributos do Renan.
 - Moral, condição física, contrato e finanças **ainda não existem** nos modelos (M2+).
 - **Partida em 90 intervalos de 1 minuto**, sem acréscimos. Só há eventos de finalização (gol, defesa, fora); intervalo (45') e fim (90') a interface deduz. Sem assistências por enquanto.
@@ -143,7 +145,7 @@ Cada `MatchEvent` tem `Minute`, `Type` (`Goal`, `Save`, `Miss`), `Club` (quem fi
 
 ## Próximos passos
 
-1. PR B: gerador de atributos e nomes, `tools/DonoDaBola.SeedBuilder` (Wikidata → estatísticas) e os 20 clubes genéricos em `data/seed.json`, embutido no Data.
+1. Revisão e merge dos PRs A e B.
 2. Fechar o M1: exemplo de integração (`MatchEngine.Simulate` com clubes do banco) para o Mateus.
 3. Roteiro completo do Core (M2 a M4): `docs/plans/2026-10-21-persistencia-e-dados.md`, seção 12.
 4. M2: simular as rodadas dos outros clubes; cartões, lesões, moral e condição física.

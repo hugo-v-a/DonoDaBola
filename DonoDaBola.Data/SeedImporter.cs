@@ -6,6 +6,14 @@ namespace DonoDaBola.Data;
 // Carrega um seed JSON (data/seed.json ou exportado) num banco vazio.
 public static class SeedImporter
 {
+    // Importa o seed padrão (data/seed.json, embutido no assembly). Use na primeira abertura: if (db.IsEmpty) ImportDefault(db).
+    public static int ImportDefault(GameDatabase db)
+    {
+        using var json = typeof(SeedImporter).Assembly.GetManifestResourceStream("DonoDaBola.Data.seed.json")
+            ?? throw new InvalidOperationException("Seed padrão não embutido no DonoDaBola.Data.");
+        return Import(db, json);
+    }
+
     // Devolve o número de clubes importados. Seed inválido lança exceção e não grava nada.
     public static int Import(GameDatabase db, Stream json)
     {

@@ -62,5 +62,6 @@ Design completo em `docs/GDD.md`. Consulte quando a tarefa envolver regras do jo
 
 ## Comandos (Windows / PowerShell)
 - Build: `dotnet build DonoDaBola.slnx`
-- Testes: `dotnet test DonoDaBola.Core.Tests` e `dotnet test DonoDaBola.Data.Tests`
+- Testes: `dotnet test DonoDaBola.Core.Tests`, `dotnet test DonoDaBola.Data.Tests` e `dotnet test tools/DonoDaBola.SeedBuilder.Tests`
+- Regerar o seed: `dotnet run --project tools/DonoDaBola.SeedBuilder -- seed` (com `-- stats`, consulta o Wikidata; rode só à mão)
 - Se o build acusar arquivo travado, peça para eu fechar o Game Studio.

@@ -12,6 +12,7 @@ public record SeedFile(IReadOnlyList<Club> Clubs)
     private static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = true,
+        NewLine = "\n", // mesmo arquivo em Windows e Linux (o seed é regenerado e comparado nos testes)
         RespectNullableAnnotations = true, // "Name": null no arquivo é rejeitado
         RespectRequiredConstructorParameters = true,
     };

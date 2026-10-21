@@ -1,0 +1,79 @@
+{
+  "SampleSize": 2740,
+  "Positions": [
+    {
+      "Position": "Goleiro",
+      "Count": 148,
+      "HeightMean": 189.86,
+      "HeightSd": 4.15,
+      "WeightMean": 82.54,
+      "WeightSd": 6.21
+    },
+    {
+      "Position": "Defensor",
+      "Count": 944,
+      "HeightMean": 181.6,
+      "HeightSd": 6.89,
+      "WeightMean": 75.77,
+      "WeightSd": 7
+    },
+    {
+      "Position": "Meio-campista",
+      "Count": 922,
+      "HeightMean": 176.85,
+      "HeightSd": 6.06,
+      "WeightMean": 71.75,
+      "WeightSd": 6.29
+    },
+    {
+      "Position": "Atacante",
+      "Count": 726,
+      "HeightMean": 179.04,
+      "HeightSd": 6.51,
+      "WeightMean": 73.85,
+      "WeightSd": 7.37
+    }
+  ],
+  "Nationalities": [
+    {
+      "Code": "BR",
+      "Share": 0.8899
+    },
+    {
+      "Code": "AR",
+      "Share": 0.0256
+    },
+    {
+      "Code": "CO",
+      "Share": 0.0139
+    },
+    {
+      "Code": "UY",
+      "Share": 0.0124
+    },
+    {
+      "Code": "PY",
+      "Share": 0.0113
+    },
+    {
+      "Code": "EC",
+      "Share": 0.0062
+    },
+    {
+      "Code": "CL",
+      "Share": 0.0048
+    },
+    {
+      "Code": "BO",
+      "Share": 0.0033
+    },
+    {
+      "Code": "ES",
+      "Share": 0.0033
+    },
+    {
+      "Code": "IT",
+      "Share": 0.0033
+    }
+  ]
+}
