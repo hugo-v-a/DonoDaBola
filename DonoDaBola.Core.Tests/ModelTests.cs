@@ -40,7 +40,7 @@ public class ModelTests
 
     private const string PlayerJson = """
         {
-          "Id": "clu01-p01", "Name": "Fulano", "Position": "Meio-campista", "Age": 22, "Potential": 16,
+          "Id": "clu01-p01", "Name": "Fulano", "Position": "Meio-campista", "BirthDate": "2004-03-10", "Potential": 16,
           "Technical": { "Passing": 14, "Dribbling": 12, "Finishing": 9, "Crossing": 10,
                          "Tackling": 8, "Marking": 7, "Heading": 6, "SetPieces": 11 },
           "Mental": { "Vision": 15, "Positioning": 10, "Decisions": 13,

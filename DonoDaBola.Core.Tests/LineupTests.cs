@@ -42,6 +42,18 @@ public class LineupTests
     }
 
     [Fact]
+    public void HasNatural442_RequiresMinimumPerPosition()
+    {
+        var club = TestPlayers.CreateClub("a");
+        Assert.True(Lineup.HasNatural442(club));
+
+        var noKeeper = club with { Squad = [.. club.Squad.Where(p => p.Position != Position.Goalkeeper)] };
+        var oneForward = club with { Squad = [.. club.Squad.Where(p => p.Position != Position.Forward), TestPlayers.Create("f0", Position.Forward)] };
+        Assert.False(Lineup.HasNatural442(noKeeper));
+        Assert.False(Lineup.HasNatural442(oneForward));
+    }
+
+    [Fact]
     public void Pick442_RejectsSquadUnder11()
     {
         var club = TestPlayers.CreateClub("a");
