@@ -1,4 +1,8 @@
 <Solution>
+  <Folder Name="/tools/">
+    <Project Path="tools/DonoDaBola.SeedBuilder.Tests/DonoDaBola.SeedBuilder.Tests.csproj" />
+    <Project Path="tools/DonoDaBola.SeedBuilder/DonoDaBola.SeedBuilder.csproj" />
+  </Folder>
   <Project Path="DonoDaBola.Core.Tests/DonoDaBola.Core.Tests.csproj" />
   <Project Path="DonoDaBola.Core/DonoDaBola.Core.csproj" />
   <Project Path="DonoDaBola.Data.Tests/DonoDaBola.Data.Tests.csproj" />

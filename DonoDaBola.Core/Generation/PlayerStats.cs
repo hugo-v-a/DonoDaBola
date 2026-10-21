@@ -1,21 +1,30 @@
+using System.Text.Json;
+
 namespace DonoDaBola.Core.Generation;
 
 // Distribuições agregadas por posição (data/player-stats.json). Sem nomes, IDs ou indivíduos (ADR 0003).
 public record PlayerStats(int SampleSize, IReadOnlyList<PositionStats> Positions, IReadOnlyList<NationalityShare> Nationalities)
 {
+    private static readonly JsonSerializerOptions Options = new() { WriteIndented = true, NewLine = "\n", RespectNullableAnnotations = true };
+
+    public string ToJson() => JsonSerializer.Serialize(this, Options);
+
+    public static PlayerStats FromJson(string json) =>
+        JsonSerializer.Deserialize<PlayerStats>(json, Options) ?? throw new JsonException("Estatísticas vazias.");
+
     public PositionStats For(Position position) =>
         Positions.SingleOrDefault(p => p.Position == position)
         ?? throw new InvalidOperationException($"Sem estatísticas para {position}.");
 
-    // Agrega amostras individuais (vindas do Wikidata pela ferramenta SeedBuilder). Idade calculada na data de referência.
-    public static PlayerStats FromSamples(IReadOnlyCollection<PlayerSample> samples, DateOnly reference, int topNationalities = 10)
+    // Agrega amostras individuais (vindas do Wikidata pela ferramenta SeedBuilder).
+    // A idade não entra: o Wikidata não identifica o elenco atual (ADR 0003); ela é parâmetro do PlayerGenerator.
+    public static PlayerStats FromSamples(IReadOnlyCollection<PlayerSample> samples, int topNationalities = 10)
     {
         var positions = samples.GroupBy(s => s.Position).OrderBy(g => g.Key).Select(g =>
         {
-            var (ageMean, ageSd) = MeanSd(g.Select(s => (double)s.BirthDate.ToAge(reference)));
             var (heightMean, heightSd) = MeanSd(g.Where(s => s.HeightCm is not null).Select(s => s.HeightCm!.Value));
             var (weightMean, weightSd) = MeanSd(g.Where(s => s.WeightKg is not null).Select(s => s.WeightKg!.Value));
-            return new PositionStats(g.Key, g.Count(), ageMean, ageSd, heightMean, heightSd, weightMean, weightSd);
+            return new PositionStats(g.Key, g.Count(), heightMean, heightSd, weightMean, weightSd);
         }).ToList();
 
         var known = samples.Where(s => s.Nationality is not null).ToList();
@@ -38,9 +47,9 @@ public record PlayerStats(int SampleSize, IReadOnlyList<PositionStats> Positions
     }
 }
 
-public record PositionStats(Position Position, int Count, double AgeMean, double AgeSd, double HeightMean, double HeightSd, double WeightMean, double WeightSd);
+public record PositionStats(Position Position, int Count, double HeightMean, double HeightSd, double WeightMean, double WeightSd);
 
 public record NationalityShare(string Code, double Share);
 
 // Um jogador real da amostra; só existe em memória dentro da ferramenta, nunca é gravado.
-public record PlayerSample(Position Position, DateOnly BirthDate, double? HeightCm, double? WeightKg, string? Nationality);
+public record PlayerSample(Position Position, double? HeightCm, double? WeightKg, string? Nationality);

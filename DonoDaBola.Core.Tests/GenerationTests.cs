@@ -12,10 +12,10 @@ public class GenerationTests
         SampleSize: 1000,
         Positions:
         [
-            new(Position.Goalkeeper, 100, AgeMean: 27, AgeSd: 5, HeightMean: 189, HeightSd: 4, WeightMean: 84, WeightSd: 5),
-            new(Position.Defender, 300, AgeMean: 26, AgeSd: 4, HeightMean: 183, HeightSd: 6, WeightMean: 77, WeightSd: 6),
-            new(Position.Midfielder, 350, AgeMean: 26, AgeSd: 4, HeightMean: 176, HeightSd: 6, WeightMean: 71, WeightSd: 6),
-            new(Position.Forward, 250, AgeMean: 25, AgeSd: 4, HeightMean: 178, HeightSd: 7, WeightMean: 74, WeightSd: 7),
+            new(Position.Goalkeeper, 100, HeightMean: 189, HeightSd: 4, WeightMean: 84, WeightSd: 5),
+            new(Position.Defender, 300, HeightMean: 183, HeightSd: 6, WeightMean: 77, WeightSd: 6),
+            new(Position.Midfielder, 350, HeightMean: 176, HeightSd: 6, WeightMean: 71, WeightSd: 6),
+            new(Position.Forward, 250, HeightMean: 178, HeightSd: 7, WeightMean: 74, WeightSd: 7),
         ],
         Nationalities: [new("BR", 0.9), new("AR", 0.05), new("UY", 0.05)]);
 
@@ -91,6 +91,16 @@ public class GenerationTests
     }
 
     [Fact]
+    public void Ages_AreRealisticForASquad()
+    {
+        var ages = League(2026).Clubs.SelectMany(c => c.Squad).Select(p => p.AgeOn(SeasonStart)).ToList();
+
+        Assert.InRange(ages.Average(), 24.5, 27.5);
+        Assert.Contains(ages, a => a <= 19);
+        Assert.Contains(ages, a => a >= 33);
+    }
+
+    [Fact]
     public void Feet_AreMostlyRight()
     {
         var players = League(2026).Clubs.SelectMany(c => c.Squad).ToList();
@@ -112,21 +122,19 @@ public class GenerationTests
     [Fact]
     public void Stats_FromSamples_AggregatesPerPosition()
     {
-        var reference = new DateOnly(2026, 1, 1);
         PlayerSample[] samples =
         [
-            new(Position.Goalkeeper, new DateOnly(1996, 1, 1), 190, 85, "BR"),
-            new(Position.Goalkeeper, new DateOnly(2000, 1, 1), 186, null, "AR"),
-            new(Position.Forward, new DateOnly(2004, 1, 1), null, 70, "BR"),
-            new(Position.Forward, new DateOnly(2002, 1, 1), 175, 72, null),
+            new(Position.Goalkeeper, 190, 85, "BR"),
+            new(Position.Goalkeeper, 186, null, "AR"),
+            new(Position.Forward, null, 70, "BR"),
+            new(Position.Forward, 175, 72, null),
         ];
 
-        var stats = PlayerStats.FromSamples(samples, reference);
+        var stats = PlayerStats.FromSamples(samples);
         var gk = stats.Positions.Single(p => p.Position == Position.Goalkeeper);
 
         Assert.Equal(4, stats.SampleSize);
         Assert.Equal(2, gk.Count);
-        Assert.Equal(28, gk.AgeMean);
         Assert.Equal(188, gk.HeightMean);
         Assert.Equal(85, gk.WeightMean);
         Assert.Equal(2 / 3.0, stats.Nationalities.Single(n => n.Code == "BR").Share, 3);

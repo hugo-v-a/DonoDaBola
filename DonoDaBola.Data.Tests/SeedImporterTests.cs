@@ -65,3 +65,17 @@ public class SeedImporterTests
         public int GetHashCode(Club obj) => obj.Id.GetHashCode();
     }
 }
+
+public class DefaultSeedTests
+{
+    // O seed publicado (data/seed.json) vai embutido no Data: funciona sem caminho de arquivo, inclusive no celular.
+    [Fact]
+    public void ImportDefault_Loads20Clubs()
+    {
+        using var db = GameDatabase.Open("Data Source=:memory:");
+
+        Assert.Equal(20, SeedImporter.ImportDefault(db));
+        Assert.Equal(20, db.GetAll().Count);
+        Assert.True(db.Count(new PlayerQuery()) >= 20 * 25);
+    }
+}

@@ -7,11 +7,14 @@ public static class PlayerGenerator
     public const double RightFootShare = 0.75, LeftFootShare = 0.20; // o resto é ambidestro; o Wikidata não tem esse dado
     public const double AttributeNoise = 1.6;
     public const int MinAge = 17, MaxAge = 37;
+    // ponytail: idade do elenco aproximada à mão (sem fonte); o Wikidata não dá a idade do elenco atual. Calibrar no M4.
+    public const double SquadAgeMean = 26, SquadAgeSd = 4.5, GoalkeeperExtraAge = 1.5;
 
     public static Player Create(Random random, PlayerStats stats, string id, string name, Position position, int level, DateOnly seasonStart)
     {
         var s = stats.For(position);
-        var age = Math.Clamp(Normal(random, s.AgeMean, s.AgeSd), MinAge, MaxAge + 0.99);
+        var ageMean = SquadAgeMean + (position == Position.Goalkeeper ? GoalkeeperExtraAge : 0);
+        var age = Math.Clamp(Normal(random, ageMean, SquadAgeSd), MinAge, MaxAge + 0.99);
         var form = level + AgeCurve(age);
         int Attr(double bias) => Math.Clamp((int)Math.Round(form + bias + Normal(random, 0, AttributeNoise)), Rating.Min, Rating.Max);
         var b = Bias.For(position);
