@@ -4,12 +4,15 @@ namespace DonoDaBola.Core.Tests;
 
 public class SmokeTests
 {
-    // Valida a configuração: o Core compila, é carregado pelos testes e não referencia a Stride.
-    [Fact]
-    public void CoreLoadsWithoutStride()
+    // Regra de arquitetura: o Core é C# puro, sem Stride e sem SQLite (quem fala com o banco é o DonoDaBola.Data).
+    [Theory]
+    [InlineData("Stride")]
+    [InlineData("Microsoft.Data.Sqlite")]
+    [InlineData("SQLitePCL")]
+    public void CoreDoesNotReference(string forbiddenPrefix)
     {
         var core = Assembly.Load("DonoDaBola.Core");
 
-        Assert.DoesNotContain(core.GetReferencedAssemblies(), a => a.Name!.StartsWith("Stride"));
+        Assert.DoesNotContain(core.GetReferencedAssemblies(), a => a.Name!.StartsWith(forbiddenPrefix));
     }
 }

@@ -8,7 +8,7 @@ public static class TestPlayers
         Id = id,
         Name = $"Jogador {id}",
         Position = position,
-        Age = 25,
+        BirthDate = new DateOnly(2000, 1, 1),
         Potential = rating,
         Technical = new()
         {
@@ -34,3 +34,6 @@ public static class TestPlayers
         return new Club { Id = id, Name = $"Clube {id}", ShortName = id.ToUpperInvariant(), Squad = squad };
     }
 }
+
+// Relógio fixo para testes: a data do jogo não depende do relógio do computador.
+public record FixedClock(DateOnly Today) : IGameClock;

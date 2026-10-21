@@ -30,6 +30,14 @@ public record Lineup(
         return new(Pick(Position.Goalkeeper, 1)[0], Pick(Position.Defender, 4), Pick(Position.Midfielder, 4), Pick(Position.Forward, 2));
     }
 
+    // O elenco tem gente suficiente em cada posição para um 4-4-2 sem improvisar (1 GOL, 4 DEF, 4 MEI, 2 ATA).
+    public static bool HasNatural442(Club club)
+    {
+        int Count(Position position) => club.Squad.Count(p => p.Position == position);
+        return Count(Position.Goalkeeper) >= 1 && Count(Position.Defender) >= 4
+            && Count(Position.Midfielder) >= 4 && Count(Position.Forward) >= 2;
+    }
+
     // Nota (1–20) do jogador atuando na posição: média dos atributos da função.
     public static double Rate(Player p, Position position) => position switch
     {
