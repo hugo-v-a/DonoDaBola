@@ -61,14 +61,20 @@ public record Player
     public required GoalkeepingAttributes Goalkeeping { get; init; }
 
     // Anos completos na data informada (normalmente a data do jogo, vinda do IGameClock).
-    public int AgeOn(DateOnly date)
-    {
-        var age = date.Year - BirthDate.Year;
-        return date < BirthDate.AddYears(age) ? age - 1 : age;
-    }
+    public int AgeOn(DateOnly date) => BirthDate.ToAge(date);
 
     private static int? InRange(int? value, int min, int max, [System.Runtime.CompilerServices.CallerMemberName] string name = "") =>
         value is null || (value >= min && value <= max)
             ? value
             : throw new ArgumentOutOfRangeException(name, value, $"{name} deve estar entre {min} e {max}.");
+}
+
+internal static class DateOnlyExtensions
+{
+    // Anos completos entre o nascimento e a data. Em ano não bissexto, quem nasceu em 29/02 completa em 28/02.
+    public static int ToAge(this DateOnly birth, DateOnly date)
+    {
+        var age = date.Year - birth.Year;
+        return date < birth.AddYears(age) ? age - 1 : age;
+    }
 }
