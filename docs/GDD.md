@@ -167,11 +167,13 @@ A Stride é uma engine open source (licença MIT), escrita em C# sobre .NET, com
 
 | Camada | Responsabilidade | Implementação prevista |
 |---|---|---|
-| Dados | Clubes, jogadores, calendário, saves | Arquivos JSON (dados iniciais) + saves serializados |
+| Dados | Clubes, jogadores, calendário, saves | Banco SQLite (`DonoDaBola.Data`) como fonte de verdade e formato do save; JSON só como seed, importação e exportação |
 | Núcleo (Core) | Simulação da partida, finanças, mercado, IA dos clubes, evolução | Biblioteca .NET separada, sem dependência da Stride; testes unitários |
 | Apresentação | Telas, entrada do usuário, mini-campo, áudio | Stride: UI system, scripts (SyncScript/AsyncScript), cenas |
 
 Essa separação também facilita a apresentação sobre a engine para a turma: o código de exemplo pode mostrar um script da Stride chamando o núcleo de simulação e atualizando a interface com o resultado de um lance.
+
+**Atualização (out/2026):** os dados saíram do JSON e foram para o SQLite, a pedido do professor (ADR 0001). O jogo passa a ser pensado para celular (Android e, se viável, iOS) desde já: UI para toque, entrada por ponteiro, nada de APIs do Windows ou caminhos fixos, e Core e Data em `net10.0` (ADR 0002). Idade, altura e demais dados de perfil seguem distribuições derivadas do Wikidata, com nomes fictícios (ADR 0003).
 
 > **Ponto de atenção:** a Stride é mais voltada a jogos 3D e o sistema de UI é menos maduro que o de outras engines; telas com muitas tabelas exigirão componentes de interface próprios. Vale validar isso cedo com um protótipo.
 
@@ -181,6 +183,8 @@ Essa separação também facilita a apresentação sobre a engine para a turma: 
 - **Balanceamento da simulação:** resultados irreais quebram a imersão; será preciso calibrar com médias reais (gols por jogo, porcentagem de vitórias do mandante etc.).
 - **Volume de dados:** 20 clubes × ~30 atletas = ~600 jogadores para cadastrar com atributos. Sugestão: gerar atributos a partir de poucos parâmetros (posição, nível, idade).
 - **Escopo:** jogos de gerenciamento crescem rápido; manter o MVP enxuto.
+- **Mobile na Stride:** Android e iOS saíram do estado experimental na 4.4, mas a própria documentação avisa que pouca gente os mantém e que regressões podem passar. O iOS só compila num Mac. Mitigação: regras de portabilidade desde já e um spike opcional num aparelho Android antes do M3.
+- **Ferramenta do Wikidata:** o serviço de consultas migra de backend em 2026–2027 e pode mudar URLs. A ferramenta roda fora do jogo; se quebrar, as distribuições podem ser escritas à mão (ADR 0003).
 
 ## 11. Escopo: MVP × versões futuras
 
@@ -192,6 +196,7 @@ Essa separação também facilita a apresentação sobre a engine para a turma: 
 | Finanças simplificadas + fair play | Construção/reforma de estádio, sócio-torcedor detalhado |
 | Mercado de compra e venda simples | Empréstimos, trocas, agentes, cláusulas complexas |
 | Uma temporada jogável + save | Carreira multi-temporada, base, aposentadoria, editor de dados |
+| Arquitetura portável (Core e Data em `net10.0`, UI para toque) | Build Android (APK) e iOS |
 
 ## 12. Questões em aberto para o grupo
 
