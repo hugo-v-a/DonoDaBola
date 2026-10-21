@@ -11,7 +11,7 @@ Marco **M1 – Uma partida**: simulação pronta na `main`. Faltam a persistênc
 | PR 1 – Modelos (`Player`, `Club`, atributos) | na `main` ([#1](https://github.com/hugo-v-a/DonoDaBola/pull/1)) |
 | PR 2 – Escalação 4-4-2 e motor de eventos | na `main` ([#2](https://github.com/hugo-v-a/DonoDaBola/pull/2)) |
 | CI – testes do Core no GitHub Actions | na `main` ([#3](https://github.com/hugo-v-a/DonoDaBola/pull/3)) |
-| PR A – Persistência SQLite, perfil do jogador, seed e saves | PR aberto: _link no PR_ |
+| PR A – Persistência SQLite, perfil do jogador, seed e saves | PR aberto: [#5](https://github.com/hugo-v-a/DonoDaBola/pull/5) |
 | PR B – Gerador, SeedBuilder e 20 clubes genéricos | a seguir (`feature/dados-iniciais`) |
 
 ## Como usar
