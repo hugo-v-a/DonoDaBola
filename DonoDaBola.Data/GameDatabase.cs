@@ -36,7 +36,8 @@ public sealed class GameDatabase : IClubRepository, IPlayerRepository, IDisposab
     public static GameDatabase OpenInDirectory(string directory)
     {
         Directory.CreateDirectory(directory);
-        return Open(new SqliteConnectionStringBuilder { DataSource = Path.Combine(directory, "game.db") }.ToString());
+        // Sem pool: ao fechar, o arquivo é liberado (no Windows, o pool mantém o game.db travado).
+        return Open(new SqliteConnectionStringBuilder { DataSource = Path.Combine(directory, "game.db"), Pooling = false }.ToString());
     }
 
     public int UserVersion => Convert.ToInt32(Scalar("PRAGMA user_version"));
@@ -66,6 +67,7 @@ public sealed class GameDatabase : IClubRepository, IPlayerRepository, IDisposab
     }
 
     // Exporta o banco no formato de seed (data/seed.json).
+    // ponytail: jogadores sem clube (club_id NULL) ficam de fora; incluir quando houver agentes livres (M3).
     public SeedFile Export() => new(GetAll());
 
     // Grava clubes e elencos numa transação: ou entra tudo, ou nada.

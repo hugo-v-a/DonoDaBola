@@ -49,7 +49,59 @@ public sealed class SaveGameStoreTests : IDisposable
         Assert.Throws<FileNotFoundException>(() => store.Load("nada"));
     }
 
+    [Fact]
+    public void Load_EmptyFile_KeepsCurrentGame()
+    {
+        var store = new SaveGameStore(_db, _dir);
+        _db.Insert([TestPlayers.CreateClub("a")]);
+        Directory.CreateDirectory(_dir);
+        File.WriteAllBytes(Path.Combine(_dir, "vazio.db"), []);
+
+        Assert.Throws<InvalidDataException>(() => store.Load("vazio"));
+        Assert.Equal(["a"], _db.GetAll().Select(c => c.Id));
+    }
+
+    [Fact]
+    public void Load_SaveFromNewerVersion_KeepsCurrentGame()
+    {
+        var store = new SaveGameStore(_db, _dir);
+        _db.Insert([TestPlayers.CreateClub("a")]);
+        store.Save("futuro");
+        using (var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={Path.Combine(_dir, "futuro.db")};Pooling=False"))
+        {
+            conn.Open();
+            new Microsoft.Data.Sqlite.SqliteCommand("PRAGMA user_version = 99", conn).ExecuteNonQuery();
+        }
+        _db.Insert([TestPlayers.CreateClub("b")]);
+
+        Assert.Throws<InvalidDataException>(() => store.Load("futuro"));
+        Assert.Equal(["a", "b"], _db.GetAll().Select(c => c.Id));
+    }
+
+    [Fact]
+    public void List_HidesFilesThatAreNotValidSlots()
+    {
+        var store = new SaveGameStore(_db, _dir);
+        store.Save("ok");
+        File.WriteAllBytes(Path.Combine(_dir, "meu save.db"), []);
+
+        Assert.Equal(["ok"], store.List());
+    }
+
+    [Fact]
+    public void SlotNames_IgnoreCase()
+    {
+        var store = new SaveGameStore(_db, _dir);
+        store.Save("Carreira");
+
+        Assert.Equal(["carreira"], store.List());
+        store.Load("CARREIRA");
+    }
+
     [Theory]
+    [InlineData("CON")]
+    [InlineData("nul")]
+    [InlineData("com1")]
     [InlineData("../fora")]
     [InlineData("a/b")]
     [InlineData("")]

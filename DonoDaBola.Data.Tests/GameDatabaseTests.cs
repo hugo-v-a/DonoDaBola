@@ -9,12 +9,15 @@ public class GameDatabaseTests
 {
     private static GameDatabase NewDb() => GameDatabase.Open("Data Source=:memory:");
 
-    private static Player Full(string id) => TestPlayers.Create(id, Position.Forward, 12) with
+    // Cada atributo com um valor diferente: uma troca de colunas no mapeamento quebra a ida e volta.
+    private static Player Full(string id) => TestPlayers.Create(id, Position.Forward) with
     {
-        BirthDate = new DateOnly(1999, 7, 3), HeightCm = 181, WeightKg = 77,
+        BirthDate = new DateOnly(1999, 7, 3), HeightCm = 181, WeightKg = 77, Potential = 17,
         PreferredFoot = PreferredFoot.Left, Nationality = "UY", DataSource = DataSource.Wikidata,
-        Technical = TestPlayers.Create(id, Position.Forward).Technical with { Finishing = 18, SetPieces = 3 },
-        Goalkeeping = TestPlayers.Create(id, Position.Forward).Goalkeeping with { Kicking = 1 },
+        Technical = new() { Passing = 1, Dribbling = 2, Finishing = 3, Crossing = 4, Tackling = 5, Marking = 6, Heading = 7, SetPieces = 8 },
+        Mental = new() { Vision = 9, Positioning = 10, Decisions = 11, Leadership = 12, Composure = 13, Aggression = 14 },
+        Physical = new() { Pace = 15, Stamina = 16, Strength = 18, Agility = 19 },
+        Goalkeeping = new() { Reflexes = 20, Positioning = 3, RushingOut = 5, Kicking = 7 },
     };
 
     [Fact]
@@ -110,6 +113,24 @@ public class GameDatabaseTests
         using var db = NewDb();
 
         Assert.Throws<ArgumentOutOfRangeException>(() => db.Find(new PlayerQuery(Limit: limit)));
+    }
+
+    // O banco é o save: a data gravada não pode depender do idioma/calendário do aparelho.
+    [Fact]
+    public void BirthDate_IsStoredInIsoRegardlessOfCulture()
+    {
+        var previous = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = new("th-TH"); // calendário budista
+            using var db = NewDb();
+            db.Insert([TestPlayers.CreateClub("a")]);
+
+            var raw = new SqliteCommand("SELECT birth_date FROM player LIMIT 1", db.Connection).ExecuteScalar();
+            Assert.Equal("2000-01-01", raw);
+            Assert.Equal(new DateOnly(2000, 1, 1), db.GetAll()[0].Squad[0].BirthDate);
+        }
+        finally { System.Globalization.CultureInfo.CurrentCulture = previous; }
     }
 
     [Fact]

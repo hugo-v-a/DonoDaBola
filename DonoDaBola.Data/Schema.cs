@@ -1,3 +1,4 @@
+using System.Globalization;
 using DonoDaBola.Core;
 using Microsoft.Data.Sqlite;
 
@@ -5,6 +6,7 @@ namespace DonoDaBola.Data;
 
 // Esquema do banco e mapeamento Player <-> linha. Para mudar o esquema, acrescente um script em Migrations
 // (nunca edite um já publicado): o índice + 1 vira o PRAGMA user_version.
+// Cada script roda numa transação; PRAGMA foreign_keys não muda dentro dela (recriar tabela exige cuidado).
 internal static class Schema
 {
     private const string Rating = "INTEGER NOT NULL CHECK ({0} BETWEEN 1 AND 20)";
@@ -65,7 +67,7 @@ internal static class Schema
     {
         object?[] values =
         [
-            p.Id, clubId, p.Name, ToText(p.Position), p.BirthDate.ToString("yyyy-MM-dd"),
+            p.Id, clubId, p.Name, ToText(p.Position), p.BirthDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             p.HeightCm, p.WeightKg, ToText(p.PreferredFoot), p.Nationality, ToText(p.DataSource), p.Potential,
             p.Technical.Passing, p.Technical.Dribbling, p.Technical.Finishing, p.Technical.Crossing,
             p.Technical.Tackling, p.Technical.Marking, p.Technical.Heading, p.Technical.SetPieces,
@@ -87,7 +89,7 @@ internal static class Schema
             Id = r.GetString(0),
             Name = r.GetString(2),
             Position = Enum.Parse<Position>(r.GetString(3), ignoreCase: true),
-            BirthDate = DateOnly.ParseExact(r.GetString(4), "yyyy-MM-dd"),
+            BirthDate = DateOnly.ParseExact(r.GetString(4), "yyyy-MM-dd", CultureInfo.InvariantCulture),
             HeightCm = r.IsDBNull(5) ? null : r.GetInt32(5),
             WeightKg = r.IsDBNull(6) ? null : r.GetInt32(6),
             PreferredFoot = Enum.Parse<PreferredFoot>(r.GetString(7), ignoreCase: true),
