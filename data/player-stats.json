@@ -19,45 +19,41 @@
     },
     {
       "Position": "Meio-campista",
-      "Count": 920,
-      "HeightMean": 176.8,
-      "HeightSd": 6.29,
-      "WeightMean": 71.78,
+      "Count": 922,
+      "HeightMean": 176.85,
+      "HeightSd": 6.06,
+      "WeightMean": 71.75,
       "WeightSd": 6.29
     },
     {
       "Position": "Atacante",
-      "Count": 728,
-      "HeightMean": 178.84,
-      "HeightSd": 7.54,
-      "WeightMean": 73.79,
+      "Count": 726,
+      "HeightMean": 179.04,
+      "HeightSd": 6.51,
+      "WeightMean": 73.85,
       "WeightSd": 7.37
     }
   ],
   "Nationalities": [
     {
       "Code": "BR",
-      "Share": 0.8847
+      "Share": 0.8899
     },
     {
       "Code": "AR",
-      "Share": 0.0241
+      "Share": 0.0256
     },
     {
       "Code": "CO",
-      "Share": 0.0135
+      "Share": 0.0139
     },
     {
       "Code": "UY",
-      "Share": 0.0117
+      "Share": 0.0124
     },
     {
       "Code": "PY",
-      "Share": 0.011
-    },
-    {
-      "Code": "IT",
-      "Share": 0.0106
+      "Share": 0.0113
     },
     {
       "Code": "EC",
@@ -65,15 +61,19 @@
     },
     {
       "Code": "CL",
-      "Share": 0.0051
-    },
-    {
-      "Code": "PT",
       "Share": 0.0048
     },
     {
+      "Code": "BO",
+      "Share": 0.0033
+    },
+    {
       "Code": "ES",
-      "Share": 0.0044
+      "Share": 0.0033
+    },
+    {
+      "Code": "IT",
+      "Share": 0.0033
     }
   ]
 }

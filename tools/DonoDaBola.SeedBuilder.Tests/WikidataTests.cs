@@ -34,7 +34,9 @@ public class WikidataTests
               "mass": { "type": "literal", "value": "86" }, "nat": { "type": "literal", "value": "BR" } },
             { "pos": { "type": "literal", "value": "winger" }, "nat": { "type": "literal", "value": "ar" } },
             { "pos": { "type": "literal", "value": "coach" }, "height": { "type": "literal", "value": "1.80" } },
-            { "height": { "type": "literal", "value": "1.75" } }
+            { "height": { "type": "literal", "value": "1.75" } },
+            { "pos": { "type": "literal", "value": "defender" }, "height": { "type": "literal", "value": "180" },
+              "mass": { "type": "literal", "value": "750" }, "nat": { "type": "literal", "value": "BR" } }
           ] } }
         """;
 
@@ -43,9 +45,11 @@ public class WikidataTests
     {
         var samples = Wikidata.ParseResults(Response);
 
-        Assert.Equal(2, samples.Count);
+        Assert.Equal(3, samples.Count);
         Assert.Equal(new PlayerSample(Position.Goalkeeper, 191, 86, "BR"), samples[0]);
         Assert.Equal(new PlayerSample(Position.Forward, null, null, "AR"), samples[1]);
+        // 180 "metros" e 750 kg são erros de cadastro: descartados, para não distorcer as médias.
+        Assert.Equal(new PlayerSample(Position.Defender, null, null, "BR"), samples[2]);
     }
 
     [Fact]
@@ -55,6 +59,7 @@ public class WikidataTests
 
         Assert.DoesNotContain("?p ", select.Replace("(", " ").Replace(")", " ") + " ");
         Assert.Contains("GROUP BY ?p", Wikidata.BuildQuery());
+        Assert.Contains("wdt:P1532", Wikidata.BuildQuery()); // país pelo esporte vem antes da cidadania (dupla nacionalidade)
         Assert.Contains("DonoDaBolaSeedBuilder/", Wikidata.UserAgent);
         Assert.Contains("github.com/hugo-v-a/DonoDaBola", Wikidata.UserAgent);
     }

@@ -1,3 +1,5 @@
+using DonoDaBola.Core.Simulation;
+
 namespace DonoDaBola.Core.Generation;
 
 // Gera um jogador com seed: perfil pelas distribuições da posição, atributos pelo nível do clube, idade e posição.
@@ -14,13 +16,15 @@ public static class PlayerGenerator
     {
         var s = stats.For(position);
         var ageMean = SquadAgeMean + (position == Position.Goalkeeper ? GoalkeeperExtraAge : 0);
-        var age = Math.Clamp(Normal(random, ageMean, SquadAgeSd), MinAge, MaxAge + 0.99);
+        // Sorteia de novo fora da faixa (cortar acumularia jogadores com a mesma data de nascimento nos limites).
+        double age;
+        do age = Normal(random, ageMean, SquadAgeSd); while (age < MinAge || age >= MaxAge + 1);
         var form = level + AgeCurve(age);
         int Attr(double bias) => Math.Clamp((int)Math.Round(form + bias + Normal(random, 0, AttributeNoise)), Rating.Min, Rating.Max);
         var b = Bias.For(position);
         int Keeper(double bias) => position == Position.Goalkeeper ? Attr(bias) : random.Next(1, 5);
 
-        return new Player
+        var player = new Player
         {
             Id = id,
             Name = name,
@@ -36,8 +40,7 @@ public static class PlayerGenerator
             },
             Nationality = PickNationality(random, stats.Nationalities),
             DataSource = DataSource.Generated,
-            // Jovens têm margem para crescer; veteranos já estão no teto.
-            Potential = Math.Clamp((int)Math.Round(form + Math.Max(0, 24 - age) * 0.6 + Normal(random, 1, 1)), 1, 20),
+            Potential = Rating.Min, // definido abaixo, a partir dos atributos gerados
             Technical = new()
             {
                 Passing = Attr(b.Passing), Dribbling = Attr(b.Dribbling), Finishing = Attr(b.Finishing), Crossing = Attr(b.Crossing),
@@ -51,6 +54,11 @@ public static class PlayerGenerator
             Physical = new() { Pace = Attr(b.Pace), Stamina = Attr(b.Stamina), Strength = Attr(b.Strength), Agility = Attr(b.Other) },
             Goalkeeping = new() { Reflexes = Keeper(2), Positioning = Keeper(2), RushingOut = Keeper(1), Kicking = Keeper(0) },
         };
+
+        // Potencial nunca abaixo do nível atual na posição; jovens têm margem para crescer.
+        var current = Lineup.Rate(player, position);
+        var growth = Math.Max(0, 24 - age) * 0.6 + Math.Abs(Normal(random, 0.5, 1));
+        return player with { Potential = Math.Clamp((int)Math.Ceiling(current + growth), Rating.Min, Rating.Max) };
     }
 
     // Evolução até 27–29 anos e declínio a partir de 31–32 (GDD §6).
@@ -60,7 +68,7 @@ public static class PlayerGenerator
         < 27 => -0.5 + (age - 21) * 0.25,
         < 30 => 1,
         < 32 => 0.5,
-        _ => 0.5 - (age - 31) * 0.8,
+        _ => 0.5 - (age - 32) * 0.8,
     };
 
     // Ajuste de cada atributo pela função: os da posição sobem, os alheios descem.
@@ -82,6 +90,7 @@ public static class PlayerGenerator
         };
     }
 
+    // ponytail: as nacionalidades fora do top 10 (cerca de 2%) viram proporção das listadas; incluir "outras" se fizer falta.
     private static string PickNationality(Random random, IReadOnlyList<NationalityShare> shares)
     {
         var roll = random.NextDouble() * shares.Sum(n => n.Share);

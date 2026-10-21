@@ -27,7 +27,15 @@ public sealed class NameGenerator(Random random)
         "Tavares", "Teixeira", "Toledo", "Vasconcelos", "Viana", "Vieira",
     ];
 
-    private readonly HashSet<string> _used = [];
+    // Combinações das listas que coincidem com jogadores reais conhecidos: nunca são geradas.
+    private static readonly HashSet<string> RealNames =
+    [
+        "Thiago Silva", "Lucas Moura", "Diego Costa", "Felipe Melo", "Hugo Souza", "Matheus Cunha", "Everton Ribeiro",
+        "Daniel Alves", "Diego Alves", "Thiago Neves", "Douglas Costa", "Arthur Melo", "Lucas Lima", "Rafael Moura",
+        "Marcos Rocha", "Marcelo Vieira", "Gabriel Barbosa", "Fernando Diniz", "Renato Gaúcho", "Vinícius Júnior",
+    ];
+
+    private readonly HashSet<string> _used = [.. RealNames];
 
     // Próximo nome ainda não usado por este gerador.
     public string Next()
@@ -42,5 +50,5 @@ public sealed class NameGenerator(Random random)
 
     // O nome é uma combinação das listas acima (usado no teste que garante que o seed não tem nomes reais copiados).
     public static bool IsGenerated(string name) =>
-        name.Split(' ') is [var first, var last] && FirstNames.Contains(first) && LastNames.Contains(last);
+        !RealNames.Contains(name) && name.Split(' ') is [var first, var last] && FirstNames.Contains(first) && LastNames.Contains(last);
 }

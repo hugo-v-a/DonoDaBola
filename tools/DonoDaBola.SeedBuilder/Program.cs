@@ -24,6 +24,8 @@ switch (args.FirstOrDefault())
     case "seed":
         {
             var stats = PlayerStats.FromJson(File.ReadAllText(StatsPath));
+            // new Random(seed) é estável na versão atual do .NET, mas não garantido entre versões:
+            // se um SDK novo mudar o algoritmo, o teste Seed_IsReproducibleFromStats avisa.
             var league = LeagueGenerator.Create(new Random(seed), stats, seasonStart);
             File.WriteAllText(SeedPath, league.ToJson() + "\n");
             Console.WriteLine($"{league.Clubs.Count} clubes e {league.Clubs.Sum(c => c.Squad.Count)} jogadores gravados em {SeedPath} (seed {seed}).");

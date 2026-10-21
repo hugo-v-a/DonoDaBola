@@ -23,14 +23,17 @@ public static class Wikidata
 
     // Uma linha por jogador (GROUP BY ?p), sem projetar o identificador: a resposta não traz QIDs nem nomes.
     // Altura e massa normalizadas para unidades SI (metro e quilograma).
+    // Nacionalidade: país pelo esporte (P1532); senão BR, se for uma das cidadanias; senão qualquer cidadania (P27).
     public static string BuildQuery() => $$"""
-        SELECT (SAMPLE(?posLabel) AS ?pos) (SAMPLE(?h) AS ?height) (SAMPLE(?m) AS ?mass) (SAMPLE(?iso) AS ?nat) WHERE {
+        SELECT (SAMPLE(?posLabel) AS ?pos) (SAMPLE(?h) AS ?height) (SAMPLE(?m) AS ?mass) (COALESCE(SAMPLE(?sport), SAMPLE(?br), SAMPLE(?iso)) AS ?nat) WHERE {
           VALUES ?club { {{string.Join(" ", SerieA2026Clubs.Select(q => "wd:" + q))}} }
           ?p wdt:P54 ?club; wdt:P106 wd:Q937857; wdt:P569 ?birth.
           FILTER(YEAR(?birth) >= 1985 && YEAR(?birth) <= 2008)
           OPTIONAL { ?p wdt:P413 ?posItem. ?posItem rdfs:label ?posLabel FILTER(LANG(?posLabel) = "en") }
           OPTIONAL { ?p p:P2048/psv:P2048/wikibase:quantityNormalized/wikibase:quantityAmount ?h }
           OPTIONAL { ?p p:P2067/psv:P2067/wikibase:quantityNormalized/wikibase:quantityAmount ?m }
+          OPTIONAL { ?p wdt:P1532/wdt:P297 ?sport }
+          OPTIONAL { ?p wdt:P27 wd:Q155. BIND("BR" AS ?br) }
           OPTIONAL { ?p wdt:P27/wdt:P297 ?iso }
         } GROUP BY ?p
         """;
@@ -58,10 +61,13 @@ public static class Wikidata
             if (ClassifyPosition(Value("pos")) is not { } position)
                 continue;
             var nationality = Value("nat")?.ToUpperInvariant();
+            // Valores fora dos limites do jogo são erros de cadastro (ex.: altura em cm marcada como metro): descartados.
+            var height = Number("height") is { } meters ? Math.Round(meters * 100) : (double?)null;
+            var mass = Number("mass");
             samples.Add(new PlayerSample(
                 position,
-                Number("height") is { } meters ? Math.Round(meters * 100) : null,
-                Number("mass"),
+                height is >= Player.MinHeightCm and <= Player.MaxHeightCm ? height : null,
+                mass is >= Player.MinWeightKg and <= Player.MaxWeightKg ? mass : null,
                 nationality is [>= 'A' and <= 'Z', >= 'A' and <= 'Z'] ? nationality : null));
         }
         return samples;
@@ -82,7 +88,9 @@ public static class Wikidata
             using var response = await http.SendAsync(request);
             if (response.StatusCode is HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable && attempt < 3)
             {
-                var wait = response.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(60);
+                var retry = response.Headers.RetryAfter;
+                var wait = retry?.Delta ?? (retry?.Date - DateTimeOffset.UtcNow) ?? TimeSpan.FromSeconds(60);
+                if (wait < TimeSpan.Zero) wait = TimeSpan.Zero;
                 Console.WriteLine($"Wikidata pediu para esperar ({(int)response.StatusCode}); nova tentativa em {wait.TotalSeconds:F0} s.");
                 await Task.Delay(wait);
                 continue;

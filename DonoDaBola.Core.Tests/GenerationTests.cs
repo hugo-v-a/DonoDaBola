@@ -69,6 +69,36 @@ public class GenerationTests
     }
 
     [Fact]
+    public void Potential_IsNeverBelowCurrentAbility()
+    {
+        var players = League(2026).Clubs.SelectMany(c => c.Squad).ToList();
+
+        Assert.All(players, p => Assert.True(p.Potential >= Math.Floor(Lineup.Rate(p, p.Position)), $"{p.Name}: {p.Potential} < {Lineup.Rate(p, p.Position):F1}"));
+    }
+
+    [Fact]
+    public void BirthDates_DoNotPileUpAtAgeLimits()
+    {
+        var births = League(2026).Clubs.SelectMany(c => c.Squad).GroupBy(p => p.BirthDate).Max(g => g.Count());
+
+        Assert.True(births <= 3, $"{births} jogadores nasceram no mesmo dia");
+    }
+
+    [Theory]
+    [InlineData("Thiago Silva")]
+    [InlineData("Lucas Moura")]
+    [InlineData("Diego Costa")]
+    public void NameGenerator_RejectsFamousRealNames(string name) => Assert.False(NameGenerator.IsGenerated(name));
+
+    [Fact]
+    public void Stats_FromSamples_RequiresHeightAndWeightPerPosition()
+    {
+        PlayerSample[] samples = [new(Position.Goalkeeper, 190, 85, "BR"), new(Position.Forward, null, 70, "BR")];
+
+        Assert.Throws<InvalidDataException>(() => PlayerStats.FromSamples(samples));
+    }
+
+    [Fact]
     public void StrongerClubs_HaveHigherAverageRatings()
     {
         var league = League(2026);
@@ -128,15 +158,17 @@ public class GenerationTests
             new(Position.Goalkeeper, 186, null, "AR"),
             new(Position.Forward, null, 70, "BR"),
             new(Position.Forward, 175, 72, null),
+            new(Position.Defender, 180, 75, "BR"),
+            new(Position.Midfielder, 175, 70, "BR"),
         ];
 
         var stats = PlayerStats.FromSamples(samples);
         var gk = stats.Positions.Single(p => p.Position == Position.Goalkeeper);
 
-        Assert.Equal(4, stats.SampleSize);
+        Assert.Equal(6, stats.SampleSize);
         Assert.Equal(2, gk.Count);
         Assert.Equal(188, gk.HeightMean);
         Assert.Equal(85, gk.WeightMean);
-        Assert.Equal(2 / 3.0, stats.Nationalities.Single(n => n.Code == "BR").Share, 3);
+        Assert.Equal(4 / 5.0, stats.Nationalities.Single(n => n.Code == "BR").Share, 3);
     }
 }

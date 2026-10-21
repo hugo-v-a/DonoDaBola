@@ -22,14 +22,18 @@ public record PlayerStats(int SampleSize, IReadOnlyList<PositionStats> Positions
     {
         var positions = samples.GroupBy(s => s.Position).OrderBy(g => g.Key).Select(g =>
         {
+            if (!g.Any(s => s.HeightCm is not null) || !g.Any(s => s.WeightKg is not null))
+                throw new InvalidDataException($"A amostra de {g.Key} não tem altura ou peso; o gerador sairia com 150 cm / 50 kg.");
             var (heightMean, heightSd) = MeanSd(g.Where(s => s.HeightCm is not null).Select(s => s.HeightCm!.Value));
             var (weightMean, weightSd) = MeanSd(g.Where(s => s.WeightKg is not null).Select(s => s.WeightKg!.Value));
             return new PositionStats(g.Key, g.Count(), heightMean, heightSd, weightMean, weightSd);
         }).ToList();
+        if (positions.Count != Enum.GetValues<Position>().Length)
+            throw new InvalidDataException("A amostra não cobre as quatro posições.");
 
         var known = samples.Where(s => s.Nationality is not null).ToList();
         var nationalities = known.GroupBy(s => s.Nationality!)
-            .OrderByDescending(g => g.Count()).ThenBy(g => g.Key)
+            .OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal)
             .Take(topNationalities)
             .Select(g => new NationalityShare(g.Key, Math.Round(g.Count() / (double)known.Count, 4)))
             .ToList();
