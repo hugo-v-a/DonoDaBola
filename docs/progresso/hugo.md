@@ -14,7 +14,7 @@ Marco **M1 – Uma partida**: a parte do Core está fechada. Simulação, persis
 | PR A – Persistência SQLite, perfil do jogador, seed e saves | na `main` ([#5](https://github.com/hugo-v-a/DonoDaBola/pull/5)) |
 | PR B – Gerador, SeedBuilder e 20 clubes genéricos | na `main` ([#6](https://github.com/hugo-v-a/DonoDaBola/pull/6)) |
 | Grafo do código (graphify) no `.gitignore` e no CLAUDE.md | na `main` ([#7](https://github.com/hugo-v-a/DonoDaBola/pull/7)) |
-| Sandbox de integração + teste ponta a ponta | PR aberto: _link no PR_ |
+| Sandbox de integração + teste ponta a ponta | PR aberto: [#8](https://github.com/hugo-v-a/DonoDaBola/pull/8) |
 
 ## Como usar
 
