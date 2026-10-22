@@ -65,3 +65,4 @@ Design completo em `docs/GDD.md`. Consulte quando a tarefa envolver regras do jo
 - Testes: `dotnet test DonoDaBola.Core.Tests`, `dotnet test DonoDaBola.Data.Tests` e `dotnet test tools/DonoDaBola.SeedBuilder.Tests`
 - Regerar o seed: `dotnet run --project tools/DonoDaBola.SeedBuilder -- seed` (com `-- stats`, consulta o Wikidata; rode só à mão)
 - Se o build acusar arquivo travado, peça para eu fechar o Game Studio.
+- Se a pasta graphify-out/ existir, consulte o grafo antes de usar grep ou ler arquivos soltos. Para atualizar: /graphify <pasta> --update
