@@ -15,6 +15,12 @@ Cache/
 *.suo
 *.userprefs
 
+# Bancos SQLite (jogo, saves e Sandbox) nunca vão para o Git
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
 # Diversos
 *.log
 Thumbs.db

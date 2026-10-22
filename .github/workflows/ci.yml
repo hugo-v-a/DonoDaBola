@@ -1,4 +1,4 @@
-# Roda os testes do Core, do Data e da ferramenta SeedBuilder em todo push na main e em todo pull request.
+# Roda os testes do Core, do Data (inclui a integração ponta a ponta), do SeedBuilder e do Sandbox em todo push na main e em todo pull request.
 # Os projetos da Stride não são compilados aqui: exigem Windows e são lentos.
 name: CI
 
@@ -18,3 +18,4 @@ jobs:
       - run: dotnet test DonoDaBola.Core.Tests
       - run: dotnet test DonoDaBola.Data.Tests
       - run: dotnet test tools/DonoDaBola.SeedBuilder.Tests
+      - run: dotnet test tools/DonoDaBola.Sandbox.Tests
