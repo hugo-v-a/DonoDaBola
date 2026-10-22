@@ -25,7 +25,7 @@ Design completo em `docs/GDD.md`. Consulte quando a tarefa envolver regras do jo
 ## Divisão do trabalho
 - Hugo: todo o Core e o Data (simulação + dados e competição, frente que era do Renan, assumida com a autorização dele).
 - Mateus: interface na Stride (ferramentas próprias de design). NÃO altere `DonoDaBola.Game`, `DonoDaBola.Windows`, nem `.sdscene`, `.sdui`, `.sdpkg`, `.sdprefab`.
-- Cada um atualiza o próprio `docs/progresso/<nome>.md`; não edite o dos outros.
+- Cada integrante mantém o próprio `docs/progresso/<nome>.md`. A cada PR, o Claude Code atualiza o arquivo do autor do PR (nunca o de outro integrante), no mesmo PR, e no começo de cada sessão reconcilia a tabela de entregas com `gh pr list --state all`.
 - Contratos que o Mateus consome (interfaces, modelos, eventos da partida) ficam estáveis e documentados em "Como usar" do `docs/progresso/hugo.md`. Mudança que quebra compatibilidade só com aviso nesse arquivo.
 
 ## Arquitetura

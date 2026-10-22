@@ -23,6 +23,18 @@ public interface IPlayerRepository
     int Count(PlayerQuery query);
 }
 
+// Leitura da temporada para as telas (Hub, Classificação, Calendário). Implementada por Competition.Season.
+public interface ISeasonView : IGameClock
+{
+    int CurrentRound { get; }   // próxima rodada a jogar (1 a 38); 39 = encerrada
+    bool IsFinished { get; }
+    DateOnly DateOf(int round);
+    IReadOnlyList<Competition.SeasonMatch> Round(int round);         // os 10 jogos, com placar se já jogados
+    IReadOnlyList<Competition.SeasonMatch> MatchesOf(string clubId); // os 38 jogos do clube
+    IReadOnlyList<Competition.StandingRow> Table();                  // ordenada, com desempate e zonas
+    IReadOnlyList<Competition.TopScorer> TopScorers(int limit = 20);
+}
+
 // O save é o próprio banco: cada slot é uma cópia do jogo em andamento.
 public interface ISaveGameStore
 {
