@@ -4,15 +4,17 @@
 
 Desde 21/10/2026 cuido também da frente **Dados e competição**, que era do Renan, com a autorização dele (marcos M1 a M4). Mudança de direção pedida pelo professor: os dados vão para um banco **SQLite**, e o jogo passa a ser pensado para **celular** (ADRs em `docs/decisoes/`).
 
-Marco **M1 – Uma partida**: simulação pronta na `main`. Persistência (PR A) e 20 clubes genéricos (PR B) estão em PR. Depois do merge, o M1 fecha com a narração na Stride (Mateus).
+Marco **M1 – Uma partida**: a parte do Core está fechada. Simulação, persistência e os 20 clubes genéricos já estão na `main`, e o Sandbox prova o caminho completo Data → Core fora da Stride. O M1 do grupo fecha quando a narração estiver na tela da Stride (Mateus; ver o guia abaixo).
 
 | Entrega | Situação |
 |---|---|
 | PR 1 – Modelos (`Player`, `Club`, atributos) | na `main` ([#1](https://github.com/hugo-v-a/DonoDaBola/pull/1)) |
 | PR 2 – Escalação 4-4-2 e motor de eventos | na `main` ([#2](https://github.com/hugo-v-a/DonoDaBola/pull/2)) |
 | CI – testes do Core no GitHub Actions | na `main` ([#3](https://github.com/hugo-v-a/DonoDaBola/pull/3)) |
-| PR A – Persistência SQLite, perfil do jogador, seed e saves | PR aberto: [#5](https://github.com/hugo-v-a/DonoDaBola/pull/5) |
-| PR B – Gerador, SeedBuilder e 20 clubes genéricos | PR aberto: [#6](https://github.com/hugo-v-a/DonoDaBola/pull/6) (base: PR A) |
+| PR A – Persistência SQLite, perfil do jogador, seed e saves | na `main` ([#5](https://github.com/hugo-v-a/DonoDaBola/pull/5)) |
+| PR B – Gerador, SeedBuilder e 20 clubes genéricos | na `main` ([#6](https://github.com/hugo-v-a/DonoDaBola/pull/6)) |
+| Grafo do código (graphify) no `.gitignore` e no CLAUDE.md | na `main` ([#7](https://github.com/hugo-v-a/DonoDaBola/pull/7)) |
+| Sandbox de integração + teste ponta a ponta | PR aberto: _link no PR_ |
 
 ## Como usar
 
@@ -63,7 +65,7 @@ saves.Load("carreira1");
 - Para mostrar a idade, use um `IGameClock`. Até o relógio do jogo chegar (M2), use uma data fixa da temporada, por exemplo `new DateOnly(2026, 1, 1)`.
 - Exportar o banco para JSON: `db.Export().ToJson()`.
 
-**Criar um jogador e um clube (Renan):**
+**Criar um jogador e um clube à mão (testes, dados falsos):**
 
 ```csharp
 var player = new Player
@@ -104,20 +106,60 @@ using DonoDaBola.Core.Simulation;
 
 var result = MatchEngine.Simulate(home, away, new Random(42)); // mesma seed = mesma partida
 
-Console.WriteLine($"{result.Home.ShortName} {result.HomeGoals} x {result.AwayGoals} {result.Away.ShortName}");
 foreach (var e in result.Events) // já em ordem de minuto, de 1 a 90
 {
-    var text = e.Type switch
-    {
-        MatchEventType.Goal => $"{e.Minute}' GOL do {e.Club.ShortName}! {e.Player.Name}",
-        MatchEventType.Save => $"{e.Minute}' {e.Goalkeeper.Name} defende o chute de {e.Player.Name}",
-        MatchEventType.Miss => $"{e.Minute}' {e.Player.Name} chuta para fora",
-        _ => "",
-    };
+    var text = $"{e.Minute}' {NarrationFormatter.Describe(e, result)}"; // frases prontas no Sandbox
 }
 ```
 
+A narração pronta está em `tools/DonoDaBola.Sandbox/NarrationFormatter.cs`, que pode ser copiada para a interface. Ela lança `ArgumentOutOfRangeException` para um tipo de evento sem frase; quando entrarem cartões e lesões (M2), o teste do Sandbox avisa.
+
 Cada `MatchEvent` tem `Minute`, `Type` (`Goal`, `Save`, `Miss`), `Club` (quem finalizou), `Player` (quem finalizou) e `Goalkeeper` (goleiro adversário). Para saber se o lance é do mandante: `e.Club == result.Home`. As escalações estão em `result.HomeLineup` e `result.AwayLineup`.
+
+## Como rodar o Sandbox
+
+O `tools/DonoDaBola.Sandbox` é um console fora da Stride. Ele abre o banco, importa o seed se o banco estiver vazio, lista clubes ou simula uma partida com narração. Nenhum projeto do jogo o referencia, então ele não entra no build mobile.
+
+```powershell
+dotnet run --project tools/DonoDaBola.Sandbox -- --listar
+dotnet run --project tools/DonoDaBola.Sandbox -- --casa clu01 --fora clu20 --seed 42
+dotnet run --project tools/DonoDaBola.Sandbox -- --db C:\temp\ddb --casa clu05 --fora clu06
+```
+
+| Argumento | Padrão | O que faz |
+|---|---|---|
+| `--db <pasta>` | `%TEMP%\DonoDaBola-sandbox` | Pasta do `game.db`. O `.gitignore` ignora `*.db`, então nenhum banco vai para o Git |
+| `--listar` | — | Os 20 clubes, com id, sigla, média de atributos e nome |
+| `--casa`, `--fora` | `clu01`, `clu02` | Clubes da partida |
+| `--seed` | `42` | Mesma seed, mesma partida |
+
+A saída da partida traz as escalações 4-4-2 (com idade em 01/01/2026 e nota), a narração minuto a minuto, o placar final e um resumo por time: finalizações, gols, defendidas e para fora.
+
+## Guia de integração na Stride (Mateus)
+
+O mesmo caminho do Sandbox (`tools/DonoDaBola.Sandbox/Program.cs`), dentro do jogo:
+
+1. **Referência:** no `DonoDaBola.Game.csproj`, acrescente `<ProjectReference Include="..\DonoDaBola.Data\DonoDaBola.Data.csproj" />`. O Data já traz o Core.
+2. **Pasta gravável:** use `VirtualFileSystem.ApplicationLocal.GetAbsolutePath("")` como pasta do banco. Nunca use caminho fixo.
+3. **Abrir o banco uma vez** (num `StartupScript`, no `Start()`). Se estiver vazio, importe o seed:
+   ```csharp
+   var db = GameDatabase.OpenInDirectory(folder);
+   if (db.IsEmpty) SeedImporter.ImportDefault(db);
+   IClubRepository clubs = db;
+   ```
+   Feche o banco (`db.Dispose()`) ao sair do jogo.
+4. **Simular por evento**, ao tocar em "Jogar", nunca no `Update()` de cada frame:
+   ```csharp
+   var result = MatchEngine.Simulate(clubs.Get("clu01")!, clubs.Get("clu02")!, new Random(seed));
+   ```
+5. **Percorrer os eventos:** `result.Events` já vem em ordem de minuto. Para cada evento, use `NarrationFormatter.Describe(e, result)` (copie a classe do Sandbox) e mostre o texto num `TextBlock`. Para uma narração "ao vivo", revele os eventos aos poucos, por exemplo um a cada X segundos de jogo; os dados já estão todos prontos.
+6. **Escalações e idade:** use `result.HomeLineup.Players` e `player.AgeOn(new DateOnly(2026, 1, 1))` até o `IGameClock` chegar (M2).
+
+**Ainda não testado dentro da Stride:**
+- **SQLite nativo:** se o `e_sqlite3` (a biblioteca nativa do SQLite) é copiado e carregado no build da Stride, no Windows e principalmente no Android.
+- **Caminho do `VirtualFileSystem`:** qual pasta real o `ApplicationLocal.GetAbsolutePath("")` devolve em cada plataforma, e se ela é gravável.
+
+Se algum dos dois falhar, me avise com a mensagem de erro; a correção fica do lado do Data.
 
 ## Decisões tomadas
 
@@ -131,22 +173,22 @@ Cada `MatchEvent` tem `Minute`, `Type` (`Goal`, `Save`, `Miss`), `Club` (quem fi
 - **Dados dos jogadores** (ADR 0003): o Wikidata entra só como amostra estatística de altura, peso e nacionalidade (2.740 jogadores). Todos os jogadores do seed são gerados, com nomes fictícios. A idade do elenco (média 26) e o pé preferido (75% destros) são parâmetros do gerador.
 - **20 clubes genéricos** (`data/seed.json`): nomes fictícios (ex.: Esporte Clube Serra Verde, `SVE`), ids `clu01`…`clu20` e jogadores `clu01-p01`… Os níveis vão de 15 (favoritos) a 8 (candidatos ao rebaixamento). Cada elenco tem 28 jogadores: 3 GOL, 9 DEF, 10 MEI e 6 ATA.
 - **Regerar os dados** (só se mudar o gerador): `dotnet run --project tools/DonoDaBola.SeedBuilder -- seed`. Com `-- stats`, consulta o Wikidata de novo. Mesma seed, mesmo arquivo; um teste confere isso.
-- **Aleatoriedade:** sem interface própria. Quem precisar de sorteio recebe um `System.Random` criado com seed (`new Random(42)`); mesma seed, mesma sequência. Vale também para o gerador de atributos do Renan.
+- **Aleatoriedade:** sem interface própria. Quem precisar de sorteio recebe um `System.Random` criado com seed (`new Random(42)`); mesma seed, mesma sequência. Vale também para o gerador de atributos.
 - Moral, condição física, contrato e finanças **ainda não existem** nos modelos (M2+).
 - **Partida em 90 intervalos de 1 minuto**, sem acréscimos. Só há eventos de finalização (gol, defesa, fora); intervalo (45') e fim (90') a interface deduz. Sem assistências por enquanto.
 - **Escalação 4-4-2 fixa** com os melhores de cada posição; se faltar gente numa posição, entra o melhor restante nessa função. Elenco com menos de 11 lança `ArgumentException`.
-- **CI:** todo PR roda `dotnet test DonoDaBola.Core.Tests` no GitHub Actions (check `core-tests`). Os projetos da Stride não são compilados no CI; compilem localmente antes de abrir o PR.
+- **CI:** todo PR roda no GitHub Actions (check `core-tests`) os testes de `DonoDaBola.Core.Tests`, `DonoDaBola.Data.Tests` (inclui o teste de integração ponta a ponta), `tools/DonoDaBola.SeedBuilder.Tests` e `tools/DonoDaBola.Sandbox.Tests`. Os projetos da Stride não são compilados no CI; compilem localmente antes de abrir o PR.
 - **Calibração atual** (times de nota 10, 1.000 jogos): 2,46 gols e 11,3 finalizações por jogo; mandante vence 37%, empate 28%, visitante 35%. Nota 15 × nota 8: o forte vence 90%. As constantes ficam no topo do `MatchEngine`; ajuste fino no M4.
 
 ## Dependências
 
 - **Renan:** a frente dele passou para mim; o carregador de JSON virou o `SeedImporter` (PR A).
-- **Mateus pode usar agora:** os modelos para dados falsos na tela de Elenco e `MatchEngine.Simulate` com os eventos para a tela de narração. O texto da narração fica na interface; o Core só entrega os dados.
+- **Mateus pode usar agora:** o banco com os 20 clubes, os repositórios paginados, `MatchEngine.Simulate` com os eventos e a `NarrationFormatter` do Sandbox. O texto da narração fica na interface; o Core só entrega os dados. O passo a passo está no guia abaixo.
 
 ## Próximos passos
 
-1. Revisão e merge dos PRs A e B.
-2. Fechar o M1: exemplo de integração (`MatchEngine.Simulate` com clubes do banco) para o Mateus.
+1. Revisão e merge do PR do Sandbox.
+2. Apoiar o Mateus na integração com a Stride (guia abaixo).
 3. Roteiro completo do Core (M2 a M4): `docs/plans/2026-10-21-persistencia-e-dados.md`, seção 12.
 4. M2: simular as rodadas dos outros clubes; cartões, lesões, moral e condição física.
-5. M4: calibrar com médias reais do Brasileirão (gols por jogo, porcentagem de vitórias do mandante), junto com o Renan.
+5. M4: calibrar com médias reais do Brasileirão (gols por jogo, porcentagem de vitórias do mandante).
