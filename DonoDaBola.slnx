@@ -1,5 +1,7 @@
 <Solution>
   <Folder Name="/tools/">
+    <Project Path="tools/DonoDaBola.Sandbox.Tests/DonoDaBola.Sandbox.Tests.csproj" />
+    <Project Path="tools/DonoDaBola.Sandbox/DonoDaBola.Sandbox.csproj" />
     <Project Path="tools/DonoDaBola.SeedBuilder.Tests/DonoDaBola.SeedBuilder.Tests.csproj" />
     <Project Path="tools/DonoDaBola.SeedBuilder/DonoDaBola.SeedBuilder.csproj" />
   </Folder>
