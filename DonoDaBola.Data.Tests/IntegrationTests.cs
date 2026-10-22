@@ -16,6 +16,7 @@ public sealed class IntegrationTests : IDisposable
     [Fact]
     public void FullPath_SeedToMatch()
     {
+        MatchResult first;
         using (var db = GameDatabase.OpenInDirectory(_dir))
         {
             Assert.True(db.IsEmpty);
@@ -25,7 +26,7 @@ public sealed class IntegrationTests : IDisposable
             var home = clubs.Get("clu01")!;
             var away = clubs.Get("clu02")!;
 
-            var first = MatchEngine.Simulate(home, away, new Random(42));
+            first = MatchEngine.Simulate(home, away, new Random(42));
             var second = MatchEngine.Simulate(home, away, new Random(42));
 
             Assert.Equal(first.HomeGoals, first.Events.Count(e => e.Type == MatchEventType.Goal && e.Club.Id == home.Id));
@@ -39,5 +40,12 @@ public sealed class IntegrationTests : IDisposable
         using var reopened = GameDatabase.OpenInDirectory(_dir);
         Assert.False(reopened.IsEmpty);
         Assert.Equal(20, reopened.GetAll().Count);
+
+        // Clubes lidos de novo do disco geram a mesma partida: pega coluna mal mapeada ou ordem de elenco alterada.
+        // Compara por projeção (o record Club compara o elenco por referência).
+        var again = MatchEngine.Simulate(reopened.Get("clu01")!, reopened.Get("clu02")!, new Random(42));
+        static object Shape(MatchResult r) =>
+            (r.HomeGoals, r.AwayGoals, string.Join(";", r.Events.Select(e => $"{e.Minute}{e.Type}{e.Player.Id}{e.Goalkeeper.Id}")));
+        Assert.Equal(Shape(first), Shape(again));
     }
 }

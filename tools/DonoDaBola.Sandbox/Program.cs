@@ -11,6 +11,10 @@ Console.OutputEncoding = Encoding.UTF8;
 // ponytail: data fixa da temporada até o IGameClock do jogo chegar (M2).
 var today = new DateOnly(2026, 1, 1);
 
+// Opção sem valor (fim da linha ou outra opção logo depois) é erro, e não uma pasta chamada "--listar".
+if (MissingValue(args) is { } option)
+    return Fail($"{option} precisa de um valor.");
+
 // 1. Banco numa pasta gravável. Na Stride, a pasta vem do VirtualFileSystem (ver docs/progresso/hugo.md).
 var folder = Arg("--db") ?? Path.Combine(Path.GetTempPath(), "DonoDaBola-sandbox");
 using var db = GameDatabase.OpenInDirectory(folder);
@@ -62,8 +66,12 @@ foreach (var e in result.Events)
     Console.WriteLine($"{e.Minute,3}'  {NarrationFormatter.Describe(e, result)}");
 }
 
+if (!halfTimeShown)
+    Console.WriteLine("     --- Intervalo ---"); // segundo tempo sem lances
+
 Console.WriteLine($"\nFim de jogo: {home.ShortName} {result.HomeGoals} x {result.AwayGoals} {away.ShortName}");
-Console.WriteLine($"\n{"",-5} {"Finalizações",12} {"Gols",5} {"Defendidas",11} {"Para fora",10}");
+// "No goleiro" = finalizações deste time defendidas pelo goleiro adversário.
+Console.WriteLine($"\n{"",-5} {"Finalizações",12} {"Gols",5} {"No goleiro",11} {"Para fora",10}");
 foreach (var club in new[] { home, away })
 {
     var mine = result.Events.Where(e => e.Club.Id == club.Id).ToList();
@@ -74,17 +82,38 @@ return 0;
 void PrintLineup(Club club, Lineup lineup)
 {
     Console.WriteLine($"\n{club.ShortName} (4-4-2)");
-    var slots = new[] { "GOL" }.Concat(Enumerable.Repeat("DEF", 4)).Concat(Enumerable.Repeat("MEI", 4)).Concat(Enumerable.Repeat("ATA", 2));
+    // Nota na função da escalação (um improvisado é avaliado na posição em que joga).
+    var slots = new[] { Position.Goalkeeper }.Concat(Enumerable.Repeat(Position.Defender, 4))
+        .Concat(Enumerable.Repeat(Position.Midfielder, 4)).Concat(Enumerable.Repeat(Position.Forward, 2));
     foreach (var (slot, p) in slots.Zip(lineup.Players))
-        Console.WriteLine($"  {slot}  {p.Name,-22} {p.AgeOn(today),2} anos  nota {Lineup.Rate(p, p.Position),4:F1}");
+        Console.WriteLine($"  {Abbrev(slot)}  {p.Name,-22} {p.AgeOn(today),2} anos  nota {Lineup.Rate(p, slot),4:F1}");
 }
+
+static string Abbrev(Position position) => position switch
+{
+    Position.Goalkeeper => "GOL",
+    Position.Defender => "DEF",
+    Position.Midfielder => "MEI",
+    _ => "ATA",
+};
 
 static int Count(List<MatchEvent> events, MatchEventType type) => events.Count(e => e.Type == type);
 
 string? Arg(string name)
 {
     var i = Array.IndexOf(args, name);
-    return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
+    return i >= 0 ? args[i + 1] : null; // valor já conferido no início do programa
+}
+
+static string? MissingValue(string[] args)
+{
+    foreach (var option in new[] { "--db", "--casa", "--fora", "--seed" })
+    {
+        var i = Array.IndexOf(args, option);
+        if (i >= 0 && (i + 1 >= args.Length || args[i + 1].StartsWith("--")))
+            return option;
+    }
+    return null;
 }
 
 static int Fail(string message)

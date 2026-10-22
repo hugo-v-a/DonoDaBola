@@ -112,7 +112,7 @@ foreach (var e in result.Events) // já em ordem de minuto, de 1 a 90
 }
 ```
 
-A narração pronta está em `tools/DonoDaBola.Sandbox/NarrationFormatter.cs`, que pode ser copiada para a interface. Ela lança `ArgumentOutOfRangeException` para um tipo de evento sem frase; quando entrarem cartões e lesões (M2), o teste do Sandbox avisa.
+A narração pronta está em `tools/DonoDaBola.Sandbox/NarrationFormatter.cs`, que pode ser copiada para a interface. No Sandbox, ela lança `ArgumentOutOfRangeException` para um tipo de evento sem frase, e o teste do Sandbox avisa quando entrar um tipo novo (cartões e lesões, no M2). **Esse teste só protege a cópia do Sandbox:** na cópia da Stride, troque o `throw` do caso padrão por uma frase genérica (ex.: `$"Lance de {e.Club.ShortName}"`), para um tipo novo não derrubar a tela no meio da partida. Quando eu acrescentar um tipo de evento, aviso aqui em "Como usar".
 
 Cada `MatchEvent` tem `Minute`, `Type` (`Goal`, `Save`, `Miss`), `Club` (quem finalizou), `Player` (quem finalizou) e `Goalkeeper` (goleiro adversário). Para saber se o lance é do mandante: `e.Club == result.Home`. As escalações estão em `result.HomeLineup` e `result.AwayLineup`.
 
@@ -133,7 +133,7 @@ dotnet run --project tools/DonoDaBola.Sandbox -- --db C:\temp\ddb --casa clu05 -
 | `--casa`, `--fora` | `clu01`, `clu02` | Clubes da partida |
 | `--seed` | `42` | Mesma seed, mesma partida |
 
-A saída da partida traz as escalações 4-4-2 (com idade em 01/01/2026 e nota), a narração minuto a minuto, o placar final e um resumo por time: finalizações, gols, defendidas e para fora.
+A saída da partida traz as escalações 4-4-2 (com idade em 01/01/2026 e nota na posição da escalação), a narração minuto a minuto, o placar final e um resumo por time: finalizações, gols, finalizações paradas pelo goleiro adversário ("No goleiro") e para fora. Uma opção sem valor (ex.: `--db` sozinho) dá erro.
 
 ## Guia de integração na Stride (Mateus)
 
@@ -141,18 +141,28 @@ O mesmo caminho do Sandbox (`tools/DonoDaBola.Sandbox/Program.cs`), dentro do jo
 
 1. **Referência:** no `DonoDaBola.Game.csproj`, acrescente `<ProjectReference Include="..\DonoDaBola.Data\DonoDaBola.Data.csproj" />`. O Data já traz o Core.
 2. **Pasta gravável:** use `VirtualFileSystem.ApplicationLocal.GetAbsolutePath("")` como pasta do banco. Nunca use caminho fixo.
-3. **Abrir o banco uma vez** (num `StartupScript`, no `Start()`). Se estiver vazio, importe o seed:
+3. **Abrir o banco uma vez**, num `StartupScript`: abra no `Start()` e feche no `Cancel()`. Para as outras telas usarem o mesmo banco, registre-o com `Services.AddService` e leia com `Services.GetService`. Esses nomes conferem com a API da Stride, mas o script não foi testado.
    ```csharp
-   var db = GameDatabase.OpenInDirectory(folder);
-   if (db.IsEmpty) SeedImporter.ImportDefault(db);
-   IClubRepository clubs = db;
+   public class GameDataScript : StartupScript
+   {
+       private GameDatabase db;
+
+       public override void Start()
+       {
+           var folder = VirtualFileSystem.ApplicationLocal.GetAbsolutePath("");
+           db = GameDatabase.OpenInDirectory(folder);
+           if (db.IsEmpty) SeedImporter.ImportDefault(db);
+           Services.AddService(db); // nas outras telas: Services.GetService<GameDatabase>()
+       }
+
+       public override void Cancel() => db?.Dispose();
+   }
    ```
-   Feche o banco (`db.Dispose()`) ao sair do jogo.
 4. **Simular por evento**, ao tocar em "Jogar", nunca no `Update()` de cada frame:
    ```csharp
    var result = MatchEngine.Simulate(clubs.Get("clu01")!, clubs.Get("clu02")!, new Random(seed));
    ```
-5. **Percorrer os eventos:** `result.Events` já vem em ordem de minuto. Para cada evento, use `NarrationFormatter.Describe(e, result)` (copie a classe do Sandbox) e mostre o texto num `TextBlock`. Para uma narração "ao vivo", revele os eventos aos poucos, por exemplo um a cada X segundos de jogo; os dados já estão todos prontos.
+5. **Percorrer os eventos:** `result.Events` já vem em ordem de minuto. Para cada evento, use `NarrationFormatter.Describe(e, result)` e mostre o texto num `TextBlock`. Copie a classe do Sandbox com o caso padrão sem `throw`, como explicado em "Como usar". Para uma narração "ao vivo", revele os eventos aos poucos, por exemplo um a cada X segundos de jogo; os dados já estão todos prontos.
 6. **Escalações e idade:** use `result.HomeLineup.Players` e `player.AgeOn(new DateOnly(2026, 1, 1))` até o `IGameClock` chegar (M2).
 
 **Ainda não testado dentro da Stride:**
@@ -183,12 +193,12 @@ Se algum dos dois falhar, me avise com a mensagem de erro; a correção fica do 
 ## Dependências
 
 - **Renan:** a frente dele passou para mim; o carregador de JSON virou o `SeedImporter` (PR A).
-- **Mateus pode usar agora:** o banco com os 20 clubes, os repositórios paginados, `MatchEngine.Simulate` com os eventos e a `NarrationFormatter` do Sandbox. O texto da narração fica na interface; o Core só entrega os dados. O passo a passo está no guia abaixo.
+- **Mateus pode usar agora:** o banco com os 20 clubes, os repositórios paginados, `MatchEngine.Simulate` com os eventos e a `NarrationFormatter` do Sandbox. O texto da narração fica na interface; o Core só entrega os dados. O passo a passo está no "Guia de integração na Stride", acima.
 
 ## Próximos passos
 
 1. Revisão e merge do PR do Sandbox.
-2. Apoiar o Mateus na integração com a Stride (guia abaixo).
+2. Apoiar o Mateus na integração com a Stride (guia acima).
 3. Roteiro completo do Core (M2 a M4): `docs/plans/2026-10-21-persistencia-e-dados.md`, seção 12.
 4. M2: simular as rodadas dos outros clubes; cartões, lesões, moral e condição física.
 5. M4: calibrar com médias reais do Brasileirão (gols por jogo, porcentagem de vitórias do mandante).
