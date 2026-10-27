@@ -62,3 +62,37 @@ public class LineupTests
         Assert.Throws<ArgumentException>(() => Lineup.Pick442(club));
     }
 }
+
+public class LineupAvailabilityTests
+{
+    private static readonly Club Club = RegressionTests.ClubOf("clu01");
+
+    [Fact]
+    public void NoUnavailable_SameAsPick442()
+    {
+        var a = Lineup.Pick442(Club);
+        var b = Lineup.Pick442(Club, new HashSet<string>());
+        Assert.Equal(a.Players, b.Players);
+    }
+
+    [Fact]
+    public void Unavailable_AreLeftOut_StartingGoalkeeperToo()
+    {
+        var first = Lineup.Pick442(Club);
+        var off = new HashSet<string> { first.Goalkeeper.Id, first.Forwards[0].Id };
+        var lineup = Lineup.Pick442(Club, off);
+        Assert.Equal(11, lineup.Players.Count());
+        Assert.DoesNotContain(lineup.Players, p => off.Contains(p.Id));
+        Assert.Equal(Position.Goalkeeper, lineup.Goalkeeper.Position);
+    }
+
+    [Fact]
+    public void MassUnavailability_StillEleven()
+    {
+        // 20 dos 28 fora: sobram 8, e o time é completado com indisponíveis do elenco.
+        var off = Club.Squad.Take(20).Select(p => p.Id).ToHashSet();
+        var lineup = Lineup.Pick442(Club, off);
+        Assert.Equal(11, lineup.Players.Distinct().Count());
+        Assert.All(Club.Squad.Skip(20), p => Assert.Contains(p, lineup.Players));
+    }
+}
