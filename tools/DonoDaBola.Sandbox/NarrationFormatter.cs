@@ -10,8 +10,11 @@ public static class NarrationFormatter
     public static string Describe(MatchEvent e, MatchResult result) => e.Type switch
     {
         MatchEventType.Goal => $"GOL do {e.Club.ShortName}! {e.Player.Name} balança a rede. {ScoreAfter(e, result)}",
-        MatchEventType.Save => $"{e.Goalkeeper.Name} defende a finalização de {e.Player.Name} ({e.Club.ShortName}).",
+        MatchEventType.Save => $"{e.Goalkeeper?.Name} defende a finalização de {e.Player.Name} ({e.Club.ShortName}).",
         MatchEventType.Miss => $"{e.Player.Name} ({e.Club.ShortName}) finaliza para fora.",
+        MatchEventType.YellowCard => $"Cartão amarelo para {e.Player.Name} ({e.Club.ShortName}).",
+        MatchEventType.SecondYellow => $"Segundo amarelo para {e.Player.Name} ({e.Club.ShortName}): expulso!",
+        MatchEventType.RedCard => $"Cartão vermelho direto para {e.Player.Name} ({e.Club.ShortName})!",
         // Tipo novo sem frase (ex.: cartões no M2) falha alto, e o teste NarrationFormatterTests avisa.
         _ => throw new ArgumentOutOfRangeException(nameof(e), e.Type, "Tipo de evento sem narração."),
     };
