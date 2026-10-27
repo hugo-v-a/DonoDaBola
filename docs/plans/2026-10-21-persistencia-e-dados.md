@@ -295,11 +295,11 @@ O iOS exige um Mac para compilar. **Vale um spike opcional** de meio dia antes d
 |---|---|---|---|---|
 | 1 | PR A: persistência, repositórios, campos do jogador, save | M1 | ✅ | O Mateus passa a consultar dados reais e paginados |
 | 2 | PR B: 20 clubes genéricos no seed | M1 | ✅ | Elenco e partida com dados de verdade |
-| 3 | Fechar M1: script de exemplo de integração (`Simulate` com dados do banco), para o Mateus copiar | M1 | ✅ | Demonstração de ponta a ponta |
-| 4 | Relógio do jogo + calendário de 38 rodadas (turno e returno) com pausa para a Copa; migração 2 (estado, partidas) | M2 | ✅ | Telas de Calendário e Hub |
-| 5 | Simular a rodada inteira; classificação com desempate (pontos, vitórias, saldo, gols pró, confronto direto); rebaixamento dos 4 últimos | M2 | ✅ | Tela de Classificação |
+| 3 | ~~Fechar M1: script de exemplo de integração~~ feito no Sandbox ([#8](https://github.com/hugo-v-a/DonoDaBola/pull/8)) | M1 | ✅ | Demonstração de ponta a ponta |
+| 4 | Relógio do jogo + calendário de 38 rodadas (turno e returno) com pausa para a Copa (PR C); migração 2 (temporada, partidas, gols) (PR D). Plano: `2026-10-22-competicao.md` | M2 | ✅ | Telas de Calendário e Hub |
+| 5 | Simular a rodada inteira; classificação com o desempate do Art. 15 do REC 2026 (ADR 0004), zonas e artilharia (PR C) | M2 | ✅ | Tela de Classificação |
 | 6 | Cartões e lesões na partida; moral e condição física | M2 | ✅ | Eventos novos para a narração |
-| 7 | Remover `Player.Age` obsoleto (avisado) | M2 | ✅ | Limpeza combinada |
+| 7 | ~~Remover `Player.Age` obsoleto~~ feito no PR A ([#5](https://github.com/hugo-v-a/DonoDaBola/pull/5)) | M2 | ✅ | Limpeza combinada |
 | 8 | Finanças simples (TV, bilheteria, salários) + fair play (limite proporcional à receita) | M3 | ✅ | Tela de Finanças |
 | 9 | Tática e formações influenciando a simulação; treino básico | M3 | ✅ | Tela de Tática |
 | 10 | Mercado simples (compra e venda, janela) + IA de transferências por carência e orçamento | M3 | ✅ | Tela de Mercado |
