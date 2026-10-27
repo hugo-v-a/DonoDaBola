@@ -6,7 +6,7 @@ Desde 21/10/2026 cuido também da frente **Dados e competição**, que era do Re
 
 Marco **M1 – Uma partida**: a parte do Core está fechada e está toda na `main`: simulação, persistência, os 20 clubes genéricos e o Sandbox. O M1 do grupo fecha quando a narração estiver na tela da Stride (Mateus; ver o guia abaixo).
 
-Marco **M2 – Uma temporada**: o bloco de competição está em PR aberto ([#9](https://github.com/hugo-v-a/DonoDaBola/pull/9)). Ele traz relógio, calendário de 38 rodadas, simulação da rodada, tabela com o desempate do regulamento, zonas e artilharia, tudo em memória. A persistência da temporada vem no PR seguinte.
+Marco **M2 – Uma temporada**: o bloco de competição já está na `main` ([#9](https://github.com/hugo-v-a/DonoDaBola/pull/9)): relógio, calendário de 38 rodadas, simulação da rodada, tabela com o desempate do regulamento, zonas e artilharia. A temporada salva no banco, com save no meio dela, está em PR aberto ([#10](https://github.com/hugo-v-a/DonoDaBola/pull/10)).
 
 | Entrega | Situação |
 |---|---|
@@ -17,7 +17,8 @@ Marco **M2 – Uma temporada**: o bloco de competição está em PR aberto ([#9]
 | PR B – Gerador, SeedBuilder e 20 clubes genéricos | na `main` ([#6](https://github.com/hugo-v-a/DonoDaBola/pull/6)) |
 | Grafo do código (graphify) no `.gitignore` e no CLAUDE.md | na `main` ([#7](https://github.com/hugo-v-a/DonoDaBola/pull/7)) |
 | Sandbox de integração + teste ponta a ponta | na `main` ([#8](https://github.com/hugo-v-a/DonoDaBola/pull/8)) |
-| PR C – Competição: relógio, calendário, rodada, tabela e artilharia (em memória) | PR aberto: [#9](https://github.com/hugo-v-a/DonoDaBola/pull/9) |
+| PR C – Competição: relógio, calendário, rodada, tabela e artilharia (em memória) | na `main` ([#9](https://github.com/hugo-v-a/DonoDaBola/pull/9)) |
+| PR D – Temporada salva: esquema v2, migração, rodada atômica, save no meio da temporada | PR aberto: [#10](https://github.com/hugo-v-a/DonoDaBola/pull/10) |
 
 ## Como usar
 
@@ -121,7 +122,7 @@ Cada `MatchEvent` tem `Minute`, `Type` (`Goal`, `Save`, `Miss`), `Club` (quem fi
 
 ## Competição (Mateus)
 
-Novo no PR C, em `DonoDaBola.Core.Competition`. Tudo é em memória; o banco vem no PR D. As telas leem pela interface `ISeasonView` (somente leitura), e só quem controla o jogo chama `AdvanceRound()`.
+Em `DonoDaBola.Core.Competition` (PR C). As telas leem pela interface `ISeasonView` (somente leitura), e só quem controla o jogo chama `AdvanceRound()`. A temporada fica no banco pela interface `ISeasonStore` (PR D; ver "Temporada salva", abaixo).
 
 ```csharp
 using DonoDaBola.Core;
@@ -159,6 +160,32 @@ var results = season.AdvanceRound();    // depois da 38ª lança InvalidOperatio
   - `None`.
   - Os nomes na tela ficam com você; o Sandbox tem um exemplo em `ZoneName`.
 - **Eventos:** só o retorno de `AdvanceRound()` traz os eventos (para a narração com `NarrationFormatter`). A temporada guarda apenas o placar e os gols.
+
+### Temporada salva (PR D) – o que muda para o Mateus
+
+O `GameDatabase` implementa `ISeasonStore`. **Novo:** ao abrir o jogo, carregue a temporada do banco. Depois de cada rodada, grave-a.
+
+```csharp
+ISeasonStore store = db;
+var season = store.LoadSeason() ?? Season.Create(db.GetAll(), seed); // null = jogo novo, sem temporada
+
+var results = season.AdvanceRound();   // narração com os eventos de results
+store.SaveSeason(season);              // grava a rodada numa transação: entra inteira ou não entra
+
+saves.Save("carreira1");               // o save copia o banco, com a temporada junto
+saves.Load("carreira1");
+season = store.LoadSeason()!;          // obrigatório depois de Load
+```
+
+**Regra:** depois de `saves.Load(...)`, sempre recarregue com `store.LoadSeason()` e descarte o objeto `Season` antigo.
+- Se o objeto antigo estiver *atrás* do banco, `SaveSeason` lança `InvalidOperationException` e não grava nada.
+- Se estiver *à frente* (por exemplo, você carregou a rodada 20 e o objeto está na 26), gravá-lo desfaria o carregamento, e isso não tem como ser detectado.
+
+- **Gravação:** `SaveSeason` grava só as rodadas ainda não gravadas e pode ser chamado de novo sem efeito. Se a gravação falhar, nada do que estava pendente entra, e o banco continua na última rodada gravada com sucesso.
+- **Erros na gravação:** um calendário diferente do salvo (mesma seed, outros jogos) lança `InvalidOperationException`, para o placar nunca cair no jogo errado.
+- **Uma temporada por banco:** gravar uma temporada de outra seed lança `InvalidOperationException`.
+- **Banco corrompido** (inclusive save editado à mão): `LoadSeason` lança sempre `InvalidDataException`; trate com uma mensagem na tela.
+- **Bancos e saves antigos (v1)** sobem sozinhos para a v2, sem perder clubes nem jogadores; apenas ainda não têm temporada (`LoadSeason()` devolve `null`).
 - **O que muda no que você já usa:** nada quebra. Só a idade passa a vir de `season.Today` em vez da data fixa `2026-01-01`.
 
 ## Como rodar o Sandbox
@@ -170,7 +197,11 @@ dotnet run --project tools/DonoDaBola.Sandbox -- --listar
 dotnet run --project tools/DonoDaBola.Sandbox -- --casa clu01 --fora clu20 --seed 42
 dotnet run --project tools/DonoDaBola.Sandbox -- --db C:\temp\ddb --casa clu05 --fora clu06
 dotnet run --project tools/DonoDaBola.Sandbox -- --temporada --seed 42
+dotnet run --project tools/DonoDaBola.Sandbox -- --temporada --seed 42 --db C:\temp\ddb --rodadas 19
+dotnet run --project tools/DonoDaBola.Sandbox -- --temporada --db C:\temp\ddb
 ```
+
+As duas últimas linhas jogam 19 rodadas, salvam e param; a segunda execução continua da rodada 20 até o fim. A tabela final sai igual à da temporada sem interrupção.
 
 | Argumento | Padrão | O que faz |
 |---|---|---|
@@ -178,7 +209,8 @@ dotnet run --project tools/DonoDaBola.Sandbox -- --temporada --seed 42
 | `--listar` | — | Os 20 clubes, com id, sigla, média de atributos e nome |
 | `--casa`, `--fora` | `clu01`, `clu02` | Clubes da partida |
 | `--seed` | `42` | Mesma seed, mesma partida (ou mesma temporada) |
-| `--temporada` | — | Simula as 38 rodadas em memória e mostra a tabela final com as zonas, o campeão, os rebaixados, a média de gols por jogo e os 5 artilheiros |
+| `--temporada` | — | Simula as 38 rodadas e mostra a tabela com as zonas, o campeão (ou líder), os rebaixados, a média de gols por jogo e os 5 artilheiros. Sem `--db`, fica só em memória; com `--db`, grava a cada rodada e continua a temporada salva na pasta |
+| `--rodadas <n>` | todas | Com `--temporada`: joga no máximo `n` rodadas e para |
 
 A saída da partida traz as escalações 4-4-2 (com idade em 28/01/2026, a data da 1ª rodada, e nota na posição da escalação), a narração minuto a minuto, o placar final e um resumo por time: finalizações, gols, finalizações paradas pelo goleiro adversário ("No goleiro") e para fora. Uma opção sem valor (ex.: `--db` sozinho) dá erro.
 
@@ -240,6 +272,9 @@ Se algum dos dois falhar, me avise com a mensagem de erro; a correção fica do 
 - **Pontuação e desempate:** 3, 1 e 0 pontos. O desempate segue o Art. 15 do REC 2026: vitórias, saldo, gols pró, confronto direto (só entre 2 clubes e só com jogos já disputados) e sorteio. Os cartões entram antes do sorteio quando existirem.
 - **Sorteio estável:** cada clube recebe uma chave fixa na criação da temporada, guardada nela. A ordem dos empatados não muda entre leituras.
 - **Zonas fixas:** 1–4 Libertadores, 5 Libertadores (preliminar), 6–11 Sul-Americana e 17–20 rebaixamento. Não há repasse de vagas.
+- **Temporada no banco** (esquema v2: `season`, `season_club`, `season_match` e `season_goal`): só tabelas novas, e a migração da v1 não mexe em clubes e jogadores. Uma temporada por banco. O calendário gravado vale mesmo se o gerador mudar.
+- **Estado do relógio sem coluna:** a rodada atual é a primeira sem placar. Por isso cada rodada é gravada numa única transação.
+- **Cartões (próximo bloco):** vão exigir a contagem por clube e por jogo, na migração v3.
 - **Temporada reprodutível:** cada jogo usa uma seed derivada da seed da temporada, da rodada e do jogo, e um teste fixa essa fórmula. A temporada guarda só placares e gols; os eventos ficam só no retorno de `AdvanceRound()`.
 - **A temporada é o relógio** (`Season : IGameClock`): não existe outra fonte de data no jogo.
 - **Calibração atual** (times de nota 10, 1.000 jogos): 2,46 gols e 11,3 finalizações por jogo; mandante vence 37%, empate 28%, visitante 35%. Nota 15 × nota 8: o forte vence 90%. As constantes ficam no topo do `MatchEngine`; ajuste fino no M4.
@@ -247,12 +282,11 @@ Se algum dos dois falhar, me avise com a mensagem de erro; a correção fica do 
 ## Dependências
 
 - **Renan:** a frente dele passou para mim; o carregador de JSON virou o `SeedImporter` (PR A).
-- **Mateus pode usar agora:** o banco com os 20 clubes, os repositórios paginados, `MatchEngine.Simulate` com os eventos e a `NarrationFormatter` do Sandbox. Depois do merge do PR C, também a temporada em memória (`ISeasonView`) para o Hub, a Classificação e o Calendário. O texto da narração fica na interface; o Core só entrega os dados. O passo a passo está no "Guia de integração na Stride", acima.
+- **Mateus pode usar agora:** o banco com os 20 clubes, os repositórios paginados, `MatchEngine.Simulate` com os eventos e a `NarrationFormatter` do Sandbox. Também a temporada (`ISeasonView`) para o Hub, a Classificação e o Calendário; depois do merge do PR D, a temporada salva no banco (`ISeasonStore`). O texto da narração fica na interface; o Core só entrega os dados. O passo a passo está no "Guia de integração na Stride", acima.
 
 ## Próximos passos
 
-1. Revisão e merge do PR C (competição).
-2. PR D: temporada salva no banco (esquema v2 com temporada, partidas e gols; migração da v1; rodada gravada numa transação; save no meio da temporada) e retomada no `--temporada` do Sandbox. Plano: `docs/plans/2026-10-22-competicao.md`.
-3. Apoiar o Mateus na integração com a Stride (guia acima).
-4. M2: cartões (com os critérios 5 e 6 do desempate e a migração v3), lesões, moral e condição física.
-5. M4: calibrar com médias reais do Brasileirão (gols por jogo, porcentagem de vitórias do mandante).
+1. Revisão e merge do PR D (temporada salva).
+2. Apoiar o Mateus na integração com a Stride (guia acima).
+3. M2: cartões (com os critérios 5 e 6 do desempate e a migração v3), lesões, moral e condição física.
+4. M4: calibrar com médias reais do Brasileirão (gols por jogo, porcentagem de vitórias do mandante).
