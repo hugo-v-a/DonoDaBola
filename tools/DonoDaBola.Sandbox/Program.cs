@@ -1,7 +1,7 @@
 // Sandbox de integração, fora da Stride: prova o caminho Data -> Core e serve de modelo para a interface.
 //   dotnet run --project tools/DonoDaBola.Sandbox -- --listar
 //   dotnet run --project tools/DonoDaBola.Sandbox -- --casa clu01 --fora clu02 --seed 42 [--db <pasta>]
-//   dotnet run --project tools/DonoDaBola.Sandbox -- --temporada --seed 42
+//   dotnet run --project tools/DonoDaBola.Sandbox -- --temporada --seed 42 [--db <pasta> [--rodadas n]]
 using System.Diagnostics;
 using System.Text;
 using DonoDaBola.Core;
@@ -42,25 +42,53 @@ var seedText = Arg("--seed") ?? "42";
 if (!int.TryParse(seedText, out var seed))
     return Fail($"Seed inválida: '{seedText}'. Use um número inteiro.");
 
-// 4. Temporada inteira, em memória: 38 rodadas, tabela final e resumo.
+// 4. Temporada: 38 rodadas, tabela e resumo. Sem --db, tudo em memória. Com --db, a temporada fica no banco
+// (ISeasonStore): grava a cada rodada e, na próxima execução com o mesmo --db, continua de onde parou.
 if (args.Contains("--temporada"))
 {
+    var persist = Arg("--db") is not null;
+    var roundsText = Arg("--rodadas");
+    var rounds = SeasonConfig.Rounds;
+    if (roundsText is not null && (!int.TryParse(roundsText, out rounds) || rounds < 1))
+        return Fail($"--rodadas inválido: '{roundsText}'. Use um número inteiro maior que zero.");
+
+    ISeasonStore store = db;
+    var season = persist ? store.LoadSeason() : null;
+    if (season is null)
+        season = Season.Create(clubs.GetAll(), seed);
+    else
+    {
+        Console.WriteLine($"Temporada salva encontrada (seed {season.Seed}): continuando da rodada {season.CurrentRound}.");
+        if (Arg("--seed") is not null && seed != season.Seed)
+            Console.WriteLine($"Aviso: --seed {seed} ignorado; a temporada salva usa a seed {season.Seed}.");
+    }
+    if (season.IsFinished)
+        Console.WriteLine("A temporada salva já terminou. Use outra pasta em --db para começar uma nova.");
+
     var watch = Stopwatch.StartNew();
-    var season = Season.Create(clubs.GetAll(), seed);
-    while (!season.IsFinished)
+    for (var i = 0; i < rounds && !season.IsFinished; i++)
+    {
         season.AdvanceRound();
+        if (persist)
+            store.SaveSeason(season); // uma transação por rodada
+    }
     watch.Stop();
 
     var table = season.Table();
-    Console.WriteLine($"\nSérie A 2026 (seed {seed}), {season.DateOf(1):dd/MM} a {season.Today:dd/MM}: tabela final");
+    var status = season.IsFinished ? "tabela final" : $"tabela depois da rodada {season.CurrentRound - 1}";
+    var lastPlayed = season.DateOf(Math.Max(1, Math.Min(season.CurrentRound - 1, SeasonConfig.Rounds)));
+    Console.WriteLine($"\nSérie A 2026 (seed {season.Seed}), {season.DateOf(1):dd/MM} a {lastPlayed:dd/MM}: {status}");
     Console.WriteLine($"{"",3} {"Clube",-5} {"P",3} {"J",3} {"V",3} {"E",3} {"D",3} {"GP",3} {"GC",3} {"SG",4}  Zona");
     foreach (var r in table)
         Console.WriteLine($"{r.Position,3} {r.Club.ShortName,-5} {r.Points,3} {r.Played,3} {r.Won,3} {r.Drawn,3} {r.Lost,3} {r.GoalsFor,3} {r.GoalsAgainst,3} {r.GoalDifference,4:+0;-0;0}  {ZoneName(r.Zone)}");
 
-    var games = season.Matches.Count;
-    Console.WriteLine($"\nCampeão: {table[0].Club.Name}");
-    Console.WriteLine($"Rebaixados: {string.Join(", ", table.Where(r => r.Zone == Zone.Relegation).Select(r => r.Club.ShortName))}");
-    Console.WriteLine($"Média de gols por jogo: {table.Sum(r => r.GoalsFor) / (double)games:F2} ({games} jogos em {watch.Elapsed.TotalSeconds:F1} s)");
+    var games = season.Matches.Count(m => m.HomeGoals is not null);
+    Console.WriteLine($"\n{(season.IsFinished ? "Campeão" : "Líder")}: {table[0].Club.Name}");
+    Console.WriteLine($"{(season.IsFinished ? "Rebaixados" : "Na zona de rebaixamento")}: {string.Join(", ", table.Where(r => r.Zone == Zone.Relegation).Select(r => r.Club.ShortName))}");
+    if (games > 0)
+        Console.WriteLine($"Média de gols por jogo: {table.Sum(r => r.GoalsFor) / (double)games:F2} ({games} jogos; esta execução levou {watch.Elapsed.TotalSeconds:F1} s)");
+    if (persist && !season.IsFinished)
+        Console.WriteLine($"Temporada salva no banco. Rode de novo com o mesmo --db para continuar da rodada {season.CurrentRound}.");
     Console.WriteLine("Artilharia:");
     foreach (var s in season.TopScorers(5))
         Console.WriteLine($"  {s.Goals,2} gols  {s.Player.Name} ({s.Club.ShortName})");
@@ -145,7 +173,7 @@ string? Arg(string name)
 
 static string? MissingValue(string[] args)
 {
-    foreach (var option in new[] { "--db", "--casa", "--fora", "--seed" })
+    foreach (var option in new[] { "--db", "--casa", "--fora", "--seed", "--rodadas" })
     {
         var i = Array.IndexOf(args, option);
         if (i >= 0 && (i + 1 >= args.Length || args[i + 1].StartsWith("--")))
