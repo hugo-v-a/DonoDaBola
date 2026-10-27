@@ -5,9 +5,9 @@ namespace DonoDaBola.Data;
 
 // Banco do jogo em SQLite: fonte de verdade em tempo de execução e formato do save.
 // Uma conexão aberta durante toda a partida (o jogo é single-thread).
-public sealed class GameDatabase : IClubRepository, IPlayerRepository, IDisposable
+public sealed partial class GameDatabase : IClubRepository, IPlayerRepository, ISeasonStore, IDisposable
 {
-    public const int SchemaVersion = 1;
+    public const int SchemaVersion = 2;
     public const int MaxPageSize = 200;
 
     internal SqliteConnection Connection { get; }
