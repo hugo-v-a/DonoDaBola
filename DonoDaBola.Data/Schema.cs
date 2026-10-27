@@ -48,6 +48,46 @@ internal static class Schema
         CREATE INDEX ix_player_club_position ON player(club_id, position);
         CREATE INDEX ix_player_position ON player(position);
         """,
+
+        // v2: temporada (só tabelas novas; clubes e jogadores ficam como estão). A rodada atual é a primeira sem
+        // placar, e a data sai da configuração: o relógio não tem coluna própria. Cartões virão na v3.
+        // Números literais (38 rodadas, 10 jogos, 90 minutos): um script publicado nunca muda com as constantes.
+        """
+        CREATE TABLE season (
+            id                   INTEGER PRIMARY KEY CHECK (id = 1),
+            seed                 INTEGER NOT NULL,
+            start_date           TEXT NOT NULL,
+            break_after_round    INTEGER NOT NULL CHECK (break_after_round BETWEEN 1 AND 37),
+            resume_date          TEXT NOT NULL,
+            days_between_rounds  INTEGER NOT NULL CHECK (days_between_rounds > 0)
+        ) STRICT;
+
+        CREATE TABLE season_club (
+            club_id   TEXT PRIMARY KEY REFERENCES club(id),
+            draw_key  INTEGER NOT NULL UNIQUE
+        ) STRICT;
+
+        CREATE TABLE season_match (
+            round       INTEGER NOT NULL CHECK (round BETWEEN 1 AND 38),
+            idx         INTEGER NOT NULL CHECK (idx BETWEEN 0 AND 9),
+            home_id     TEXT NOT NULL REFERENCES club(id),
+            away_id     TEXT NOT NULL REFERENCES club(id),
+            home_goals  INTEGER CHECK (home_goals >= 0),
+            away_goals  INTEGER CHECK (away_goals >= 0),
+            PRIMARY KEY (round, idx),
+            CHECK (home_id <> away_id),
+            CHECK ((home_goals IS NULL) = (away_goals IS NULL))
+        ) STRICT;
+
+        CREATE TABLE season_goal (
+            round      INTEGER NOT NULL,
+            idx        INTEGER NOT NULL,
+            minute     INTEGER NOT NULL CHECK (minute BETWEEN 1 AND 90),
+            club_id    TEXT NOT NULL REFERENCES club(id),
+            player_id  TEXT NOT NULL REFERENCES player(id),
+            FOREIGN KEY (round, idx) REFERENCES season_match(round, idx)
+        ) STRICT;
+        """,
     ];
 
     public static readonly string PlayerColumns =

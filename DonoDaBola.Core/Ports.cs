@@ -35,6 +35,14 @@ public interface ISeasonView : IGameClock
     IReadOnlyList<Competition.TopScorer> TopScorers(int limit = 20);
 }
 
+// Temporada guardada no banco (uma por jogo). SaveSeason grava só o que mudou, numa transação:
+// uma rodada entra inteira ou não entra. Chame depois de cada AdvanceRound().
+public interface ISeasonStore
+{
+    Competition.Season? LoadSeason(); // null se o jogo ainda não tem temporada
+    void SaveSeason(Competition.Season season);
+}
+
 // O save é o próprio banco: cada slot é uma cópia do jogo em andamento.
 public interface ISaveGameStore
 {

@@ -6,7 +6,7 @@
 
 **Arquitetura:** tudo novo no Core fica em `DonoDaBola.Core.Competition`, em C# puro e em memória. O Data só grava e lê a temporada (esquema v2). O Mateus lê pela interface `ISeasonView` e avança com `Season.AdvanceRound()`.
 
-**Branches:** PR C `feature/calendario-e-tabela` → `main`; PR D `feature/temporada-persistida` → `feature/calendario-e-tabela`.
+**Branches:** PR C `feature/calendario-e-tabela` → `main`; PR D `feature/temporada-persistida` → `main` (criada da `main` depois do merge do PR C).
 
 ---
 
@@ -64,7 +64,7 @@ public record SeasonConfig(DateOnly Start, int BreakAfterRound, DateOnly ResumeO
 
 ### Rodada e temporada: `Season`
 - `Season.Create(clubs, seed, config)` gera o calendário e o sorteio de desempate.
-- `Season.Restore(clubs, seed, config, matches, drawKeys)` remonta uma temporada salva (PR D).
+- `Season.Restore(clubs, seed, config, matches, goals, drawKeys)` remonta uma temporada salva (PR D).
 - `AdvanceRound()` simula os 10 jogos da rodada atual e devolve os `MatchResult` completos, com eventos, para a narração.
 - **Seed de cada jogo:** `unchecked(seed * 1_000_003 + round * 1_009 + index)`, com aritmética fixa. Não use `HashCode.Combine`, que muda a cada execução do processo. Por isso a temporada é retomável: o jogo N da rodada R tem sempre a mesma seed.
 - **Eventos:** só ficam em memória, no retorno de `AdvanceRound()`. A temporada guarda só o placar.
