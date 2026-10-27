@@ -6,7 +6,9 @@ Desde 21/10/2026 cuido também da frente **Dados e competição**, que era do Re
 
 Marco **M1 – Uma partida**: a parte do Core está fechada e está toda na `main`: simulação, persistência, os 20 clubes genéricos e o Sandbox. O M1 do grupo fecha quando a narração estiver na tela da Stride (Mateus; ver o guia abaixo).
 
-Marco **M2 – Uma temporada**: o bloco de competição já está na `main` ([#9](https://github.com/hugo-v-a/DonoDaBola/pull/9)): relógio, calendário de 38 rodadas, simulação da rodada, tabela com o desempate do regulamento, zonas e artilharia. A temporada salva no banco, com save no meio dela, está em PR aberto ([#10](https://github.com/hugo-v-a/DonoDaBola/pull/10)).
+Marco **M2 – Uma temporada**: o bloco de competição já está na `main` ([#9](https://github.com/hugo-v-a/DonoDaBola/pull/9)): relógio, calendário de 38 rodadas, simulação da rodada, tabela com o desempate do regulamento, zonas e artilharia. A temporada salva no banco, com save no meio dela, também já está na `main` ([#10](https://github.com/hugo-v-a/DonoDaBola/pull/10)).
+
+**Profundidade da simulação (M2):** cartões, suspensões e os critérios 5 e 6 do desempate estão em PR aberto ([#11](https://github.com/hugo-v-a/DonoDaBola/pull/11)). Lesões, condição física e moral vêm no PR seguinte.
 
 | Entrega | Situação |
 |---|---|
@@ -18,7 +20,8 @@ Marco **M2 – Uma temporada**: o bloco de competição já está na `main` ([#9
 | Grafo do código (graphify) no `.gitignore` e no CLAUDE.md | na `main` ([#7](https://github.com/hugo-v-a/DonoDaBola/pull/7)) |
 | Sandbox de integração + teste ponta a ponta | na `main` ([#8](https://github.com/hugo-v-a/DonoDaBola/pull/8)) |
 | PR C – Competição: relógio, calendário, rodada, tabela e artilharia (em memória) | na `main` ([#9](https://github.com/hugo-v-a/DonoDaBola/pull/9)) |
-| PR D – Temporada salva: esquema v2, migração, rodada atômica, save no meio da temporada | PR aberto: [#10](https://github.com/hugo-v-a/DonoDaBola/pull/10) |
+| PR D – Temporada salva: esquema v2, migração, rodada atômica, save no meio da temporada | na `main` ([#10](https://github.com/hugo-v-a/DonoDaBola/pull/10)) |
+| PR E – Disciplina: cartões, suspensões, critérios 5 e 6, migração v3 | PR aberto: [#11](https://github.com/hugo-v-a/DonoDaBola/pull/11) |
 
 ## Como usar
 
@@ -35,7 +38,7 @@ Modelos e interfaces em `DonoDaBola.Core`; escalação e partida em `DonoDaBola.
 | `Nationality` | novo: código ISO de 2 letras, padrão `"BR"` |
 | `DataSource` | novo: `Generated` (padrão) ou `Wikidata`; no JSON `gerado`, `wikidata` |
 
-O resto (atributos, `Position`, `Club`, `Lineup`, `MatchEngine`, eventos) não mudou.
+O resto (atributos, `Position`, `Club`, `Lineup`, `MatchEngine`) não mudou. Os eventos da partida ganharam os cartões no PR E (ver "Cartões e suspensões (PR E)", abaixo).
 
 ### Acessar os dados pelo banco (Mateus)
 
@@ -118,7 +121,40 @@ foreach (var e in result.Events) // já em ordem de minuto, de 1 a 90
 
 A narração pronta está em `tools/DonoDaBola.Sandbox/NarrationFormatter.cs`, que pode ser copiada para a interface. No Sandbox, ela lança `ArgumentOutOfRangeException` para um tipo de evento sem frase, e o teste do Sandbox avisa quando entrar um tipo novo (cartões e lesões, no M2). **Esse teste só protege a cópia do Sandbox:** na cópia da Stride, troque o `throw` do caso padrão por uma frase genérica (ex.: `$"Lance de {e.Club.ShortName}"`), para um tipo novo não derrubar a tela no meio da partida. Quando eu acrescentar um tipo de evento, aviso aqui em "Como usar".
 
-Cada `MatchEvent` tem `Minute`, `Type` (`Goal`, `Save`, `Miss`), `Club` (quem finalizou), `Player` (quem finalizou) e `Goalkeeper` (goleiro adversário). Para saber se o lance é do mandante: `e.Club == result.Home`. As escalações estão em `result.HomeLineup` e `result.AwayLineup`.
+Cada `MatchEvent` tem `Minute`, `Type`, `Club`, `Player` e `Goalkeeper`.
+- **Finalizações** (`Goal`, `Save`, `Miss`): `Club` e `Player` são de quem finalizou, e `Goalkeeper` é o goleiro adversário.
+- **Cartões** (PR E): `Club` e `Player` são de quem recebeu o cartão, e `Goalkeeper` é nulo.
+- **Mandante:** para saber se o lance é do mandante, use `e.Club == result.Home`.
+- **Escalações:** estão em `result.HomeLineup` e `result.AwayLineup`.
+
+### Cartões e suspensões (PR E) – o que muda para o Mateus
+
+**Nada quebra a compilação de quem usa os tipos.** A exceção é um "falso" `ISeasonView` escrito para testes da interface: ele precisa implementar os dois membros novos. O que mudou:
+
+| Membro | Mudança |
+|---|---|
+| `MatchEventType` | **novos valores:** `YellowCard`, `SecondYellow` (2º amarelo, expulsão) e `RedCard` (vermelho direto). `Goal`, `Save` e `Miss` não mudaram |
+| `MatchEvent.Goalkeeper` | agora `Player?`: **nulo nos cartões**. `e.Goalkeeper.Name` só gera aviso de nulo; nas finalizações ele continua preenchido |
+| `MatchEvent.IsShot` | **novo:** `true` para `Goal`, `Save` e `Miss`. **Atenção:** quem conta finalizações com `result.Events.Count` precisa filtrar por `IsShot` |
+| `MatchEngine.Simulate(home, away, random)` | igual ao M1, sem cartões |
+| `MatchEngine.Simulate(home, away, random, MatchOptions)` | **novo:** com `Discipline` e `Cards` (um `Random` só dos cartões), a partida tem cartões e expulsões |
+| `Lineup.Pick442(club, indisponiveis)` | **novo:** escala sem os ids informados, sempre com 11 |
+
+- **Ordem dos eventos:** no mesmo minuto, a finalização vem antes do cartão.
+- **Expulsão:** a expulsão enfraquece o time até o fim, e o expulso não aparece em mais nenhum evento. O goleiro só recebe amarelo.
+- **Fim da temporada:** a suspensão não passa para a temporada seguinte, e com a temporada encerrada `UnavailableOf` fica vazio.
+- **Narração:** a cópia da `NarrationFormatter` na Stride não quebra, porque o caso padrão dela não lança. As frases novas do Sandbox, para copiar:
+  ```csharp
+  MatchEventType.YellowCard => $"Cartão amarelo para {e.Player.Name} ({e.Club.ShortName}).",
+  MatchEventType.SecondYellow => $"Segundo amarelo para {e.Player.Name} ({e.Club.ShortName}): expulso!",
+  MatchEventType.RedCard => $"Cartão vermelho direto para {e.Player.Name} ({e.Club.ShortName})!",
+  ```
+- **Na temporada,** `AdvanceRound()` já usa os cartões, escala sem os suspensos e grava os cartões. Leitura nova na `ISeasonView`:
+  ```csharp
+  var missing = view.UnavailableOf("clu01"); // Unavailable: Player, Reason (Suspended), ReturnRound (rodada em que volta)
+  var fair = view.DisciplineTable();      // DisciplineRow: Club, Yellows, Reds, Suspensions (menos vermelhos e depois amarelos primeiro)
+  ```
+- **A tabela já usa os critérios 5 e 6** (menos vermelhos, depois menos amarelos) antes do sorteio. A expulsão por 2º amarelo conta 1 vermelho e 1 amarelo.
 
 ## Competição (Mateus)
 
@@ -159,7 +195,7 @@ var results = season.AdvanceRound();    // depois da 38ª lança InvalidOperatio
   - `Relegation` (17º ao 20º);
   - `None`.
   - Os nomes na tela ficam com você; o Sandbox tem um exemplo em `ZoneName`.
-- **Eventos:** só o retorno de `AdvanceRound()` traz os eventos (para a narração com `NarrationFormatter`). A temporada guarda apenas o placar e os gols.
+- **Eventos:** só o retorno de `AdvanceRound()` traz os eventos (para a narração com `NarrationFormatter`). A temporada guarda o placar, os gols e os cartões (PR E).
 
 ### Temporada salva (PR D) – o que muda para o Mateus
 
@@ -209,10 +245,10 @@ As duas últimas linhas jogam 19 rodadas, salvam e param; a segunda execução c
 | `--listar` | — | Os 20 clubes, com id, sigla, média de atributos e nome |
 | `--casa`, `--fora` | `clu01`, `clu02` | Clubes da partida |
 | `--seed` | `42` | Mesma seed, mesma partida (ou mesma temporada) |
-| `--temporada` | — | Simula as 38 rodadas e mostra a tabela com as zonas, o campeão (ou líder), os rebaixados, a média de gols por jogo e os 5 artilheiros. Sem `--db`, fica só em memória; com `--db`, grava a cada rodada e continua a temporada salva na pasta |
+| `--temporada` | — | Simula as 38 rodadas e mostra a tabela com as zonas, o campeão (ou líder), os rebaixados, a média de gols por jogo e os 5 artilheiros. Também mostra a disciplina: amarelos e vermelhos por jogo (somando os dois times), suspensos por clube por rodada e, por clube, amarelos, vermelhos, suspensões e suspensões por acúmulo de amarelos. Sem `--db`, fica só em memória; com `--db`, grava a cada rodada e continua a temporada salva na pasta |
 | `--rodadas <n>` | todas | Com `--temporada`: joga no máximo `n` rodadas e para |
 
-A saída da partida traz as escalações 4-4-2 (com idade em 28/01/2026, a data da 1ª rodada, e nota na posição da escalação), a narração minuto a minuto, o placar final e um resumo por time: finalizações, gols, finalizações paradas pelo goleiro adversário ("No goleiro") e para fora. Uma opção sem valor (ex.: `--db` sozinho) dá erro.
+A saída da partida traz as escalações 4-4-2 (com idade em 28/01/2026, a data da 1ª rodada, e nota na posição da escalação), a narração minuto a minuto, o placar final e um resumo por time: finalizações, gols, finalizações paradas pelo goleiro adversário ("No goleiro"), para fora, amarelos e expulsões. A partida avulsa tem cartões, como na temporada. Uma opção sem valor (ex.: `--db` sozinho) dá erro.
 
 ## Guia de integração na Stride (Mateus)
 
@@ -274,19 +310,28 @@ Se algum dos dois falhar, me avise com a mensagem de erro; a correção fica do 
 - **Zonas fixas:** 1–4 Libertadores, 5 Libertadores (preliminar), 6–11 Sul-Americana e 17–20 rebaixamento. Não há repasse de vagas.
 - **Temporada no banco** (esquema v2: `season`, `season_club`, `season_match` e `season_goal`): só tabelas novas, e a migração da v1 não mexe em clubes e jogadores. Uma temporada por banco. O calendário gravado vale mesmo se o gerador mudar.
 - **Estado do relógio sem coluna:** a rodada atual é a primeira sem placar. Por isso cada rodada é gravada numa única transação.
-- **Cartões (próximo bloco):** vão exigir a contagem por clube e por jogo, na migração v3.
-- **Temporada reprodutível:** cada jogo usa uma seed derivada da seed da temporada, da rodada e do jogo, e um teste fixa essa fórmula. A temporada guarda só placares e gols; os eventos ficam só no retorno de `AdvanceRound()`.
+- **Temporada reprodutível:** cada jogo usa uma seed derivada da seed da temporada, da rodada e do jogo, e um teste fixa essa fórmula. A temporada guarda placares, gols e cartões; os demais eventos ficam só no retorno de `AdvanceRound()`.
 - **A temporada é o relógio** (`Season : IGameClock`): não existe outra fonte de data no jogo.
+- **Disciplina** ([ADR 0005](../decisoes/0005-condicao-disciplina-e-lesoes.md)):
+  - as regras são **adotadas, não confirmadas pela CBF**, porque o Manual de Competições 2026 não foi encontrado;
+  - o 3º amarelo suspende 1 jogo, sem zerar na temporada;
+  - o vermelho direto e o 2º amarelo suspendem 1 jogo cada, e os amarelos da expulsão não contam para a série;
+  - tudo fica em `DisciplineRules`.
+- **Cartões no desempate:** a expulsão por 2º amarelo conta 1 vermelho e 1 amarelo (escolha nossa, num único método, `Discipline.TieBreakCards`).
+- **Suspensões derivadas dos cartões gravados:** não há estado de disciplina no banco (v3 só cria `season_card`).
+- **Cartões não mudam os gols:** eles usam uma sequência aleatória própria. Com `DisciplineRules.Off`, as 20 partidas e a temporada de referência da `main` antiga saem idênticas (testes de regressão).
+- **Cartões por jogo, somando os dois times:** cerca de 5,25 amarelos e 0,27 vermelho, contra 5,4 e 0,25 a 0,28 no Brasileirão real.
+- **Efeito na temporada:** em 20 seeds, o mesmo campeão em 18 de 20, e de 2,599 para 2,603 gols por jogo.
 - **Calibração atual** (times de nota 10, 1.000 jogos): 2,46 gols e 11,3 finalizações por jogo; mandante vence 37%, empate 28%, visitante 35%. Nota 15 × nota 8: o forte vence 90%. As constantes ficam no topo do `MatchEngine`; ajuste fino no M4.
 
 ## Dependências
 
 - **Renan:** a frente dele passou para mim; o carregador de JSON virou o `SeedImporter` (PR A).
-- **Mateus pode usar agora:** o banco com os 20 clubes, os repositórios paginados, `MatchEngine.Simulate` com os eventos e a `NarrationFormatter` do Sandbox. Também a temporada (`ISeasonView`) para o Hub, a Classificação e o Calendário; depois do merge do PR D, a temporada salva no banco (`ISeasonStore`). O texto da narração fica na interface; o Core só entrega os dados. O passo a passo está no "Guia de integração na Stride", acima.
+- **Mateus pode usar agora:** o banco com os 20 clubes, os repositórios paginados, `MatchEngine.Simulate` com os eventos e a `NarrationFormatter` do Sandbox. Também a temporada (`ISeasonView`) para o Hub, a Classificação e o Calendário, e a temporada salva no banco (`ISeasonStore`). Depois do merge do PR E, os cartões na narração, os suspensos (`UnavailableOf`) e a tabela de disciplina (`DisciplineTable`). O texto da narração fica na interface; o Core só entrega os dados. O passo a passo está no "Guia de integração na Stride", acima.
 
 ## Próximos passos
 
-1. Revisão e merge do PR D (temporada salva).
-2. Apoiar o Mateus na integração com a Stride (guia acima).
-3. M2: cartões (com os critérios 5 e 6 do desempate e a migração v3), lesões, moral e condição física.
+1. Revisão e merge do PR E (disciplina).
+2. PR F: lesões (em jogo e em treino, com reposição automática), condição física (recuperação de 60% do que falta por rodada) e moral, com a migração v4. Plano: `docs/plans/2026-10-27-disciplina-e-condicao.md`.
+3. Apoiar o Mateus na integração com a Stride (guia acima).
 4. M4: calibrar com médias reais do Brasileirão (gols por jogo, porcentagem de vitórias do mandante).
