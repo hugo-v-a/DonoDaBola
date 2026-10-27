@@ -5,7 +5,7 @@ using Microsoft.Data.Sqlite;
 
 namespace DonoDaBola.Data.Tests;
 
-// Temporada salva no banco (esquema v2): retomada, gravação atômica da rodada, saves e migração da v1.
+// Temporada salva no banco (esquemas v2 e v3): retomada, gravação atômica da rodada, cartões, saves e migrações.
 public sealed class SeasonStoreTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), $"ddb-temporada-{Guid.NewGuid():N}");
@@ -30,7 +30,9 @@ public sealed class SeasonStoreTests : IDisposable
 
     private static string Shape(Season s) =>
         string.Join(";", s.Table().Select(r => $"{r.Club.Id}:{r.Points}:{r.GoalsFor}:{r.GoalsAgainst}"))
-        + "|" + string.Join(";", s.TopScorers(10).Select(t => $"{t.Player.Id}:{t.Goals}"));
+        + "|" + string.Join(";", s.TopScorers(10).Select(t => $"{t.Player.Id}:{t.Goals}"))
+        + "|" + string.Join(";", s.Cards.Select(c => $"{c.Round}.{c.Index}.{c.Minute}:{c.PlayerId}:{c.Type}"))
+        + "|" + string.Join(";", s.DisciplineTable().Select(d => $"{d.Club.Id}:{d.Suspensions}"));
 
     [Fact]
     public void LoadSeason_WithoutSeason_ReturnsNull()
@@ -189,7 +191,7 @@ public sealed class SeasonStoreTests : IDisposable
     }
 
     [Fact]
-    public void VersionOneDatabase_OpensInVersionTwo_WithDataIntact()
+    public void VersionOneDatabase_OpensInCurrentVersion_WithDataIntact()
     {
         Directory.CreateDirectory(_dir);
         var path = Path.Combine(_dir, "v1.db");
@@ -198,7 +200,7 @@ public sealed class SeasonStoreTests : IDisposable
 
         using (var db = GameDatabase.Open($"Data Source={path};Pooling=False"))
         {
-            Assert.Equal(2, db.UserVersion);
+            Assert.Equal(GameDatabase.SchemaVersion, db.UserVersion);
             var read = db.Get("velho")!;
             Assert.Equal(club.Squad.Select(p => p.Id), read.Squad.Select(p => p.Id));
             Assert.Equal(club.Squad.Select(p => (p.BirthDate, p.Technical.Finishing)), read.Squad.Select(p => (p.BirthDate, p.Technical.Finishing)));
@@ -210,8 +212,70 @@ public sealed class SeasonStoreTests : IDisposable
         var saves = new SaveGameStore(current, _dir);
         File.Move(path, Path.Combine(_dir, "antigo.db"));
         saves.Load("antigo");
-        Assert.Equal(2, current.UserVersion);
+        Assert.Equal(GameDatabase.SchemaVersion, current.UserVersion);
         Assert.Equal(["velho"], current.GetAll().Select(c => c.Id));
+    }
+
+    [Fact]
+    public void SaveSeason_FailureOnACardMidRound_LeavesNothingOfTheRound()
+    {
+        using var db = SeededDb();
+        var season = Season.Create(db.GetAll(), 8);
+        Play(season, 2);
+
+        // Cartão de um jogador que só existe em memória: viola a chave estrangeira no meio da rodada 2.
+        var last = season.Cards.Where(c => c.Round == 2).MaxBy(c => c.Index)!;
+        Assert.True(last.Index > 0, "o cartão precisa estar no meio da rodada");
+        var ghost = TestPlayers.Create("fantasma", Position.Defender);
+        var clubs = db.GetAll().Select(c => c.Id == last.ClubId ? c with { Squad = [.. c.Squad, ghost] } : c).ToList();
+        var cards = season.Cards.Select(c => c == last ? c with { PlayerId = ghost.Id } : c).ToList();
+        var broken = Season.Restore(clubs, season.Seed, season.Config, season.Matches, season.Goals, season.DrawKeys, cards);
+
+        var ok = Season.Create(db.GetAll(), 8);
+        Play(ok, 1);
+        db.SaveSeason(ok);
+        Assert.Throws<SqliteException>(() => db.SaveSeason(broken));
+
+        var loaded = db.LoadSeason()!;
+        Assert.Equal(2, loaded.CurrentRound);
+        Assert.All(loaded.Round(2), m => Assert.Null(m.HomeGoals));
+        Assert.DoesNotContain(loaded.Cards, c => c.Round == 2);
+        Assert.DoesNotContain(loaded.Goals, g => g.Round == 2);
+        Assert.Equal(ok.Cards, loaded.Cards);
+    }
+
+    [Fact]
+    public void VersionTwoDatabase_HalfSeason_OpensInVersionThree_AndContinues()
+    {
+        var path = Path.Combine(_dir, "v2.db");
+        Directory.CreateDirectory(_dir);
+        Season half;
+        using (var db = GameDatabase.Open($"Data Source={path};Pooling=False"))
+        {
+            SeedImporter.ImportDefault(db);
+            half = Season.Create(db.GetAll(), 9);
+            Play(half, 10);
+            db.SaveSeason(half);
+        }
+        // A v3 só acrescenta season_card: sem ela e com user_version = 2, o arquivo fica igual a um banco da v2.
+        using (var conn = new SqliteConnection($"Data Source={path};Pooling=False"))
+        {
+            conn.Open();
+            using var cmd = new SqliteCommand("DROP TABLE season_card; PRAGMA user_version = 2;", conn);
+            cmd.ExecuteNonQuery();
+        }
+
+        using var reopened = GameDatabase.Open($"Data Source={path};Pooling=False");
+        Assert.Equal(GameDatabase.SchemaVersion, reopened.UserVersion);
+        var loaded = reopened.LoadSeason()!;
+        Assert.Equal(11, loaded.CurrentRound);
+        Assert.Empty(loaded.Cards); // save antigo: sem cartões, sem suspensões
+        Assert.Equal(half.Matches.Select(m => (m.HomeGoals, m.AwayGoals)), loaded.Matches.Select(m => (m.HomeGoals, m.AwayGoals)));
+        Assert.Equal(half.Goals, loaded.Goals);
+
+        Play(loaded, 38);
+        reopened.SaveSeason(loaded);
+        Assert.True(reopened.LoadSeason()!.IsFinished);
     }
 
     // Banco como a versão 1 deixava: só o primeiro script de migração, com um clube.

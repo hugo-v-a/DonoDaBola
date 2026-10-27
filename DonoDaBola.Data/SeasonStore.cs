@@ -1,6 +1,7 @@
 using System.Globalization;
 using DonoDaBola.Core;
 using DonoDaBola.Core.Competition;
+using DonoDaBola.Core.Simulation;
 using Microsoft.Data.Sqlite;
 
 namespace DonoDaBola.Data;
@@ -34,7 +35,9 @@ public sealed partial class GameDatabase
 
         using var update = Command("UPDATE season_match SET home_goals = $h, away_goals = $a WHERE round = $r AND idx = $i AND home_id = $home AND away_id = $away AND home_goals IS NULL", tx);
         using var insert = Command("INSERT INTO season_goal (round, idx, minute, club_id, player_id) VALUES ($r, $i, $m, $c, $p)", tx);
+        using var insertCard = Command("INSERT INTO season_card (round, idx, minute, club_id, player_id, kind) VALUES ($r, $i, $m, $c, $p, $k)", tx);
         var goals = season.Goals.ToLookup(g => (g.Round, g.Index));
+        var cards = season.Cards.ToLookup(c => (c.Round, c.Index));
         // Os jogos jogados formam rodadas inteiras em ordem (Season valida): os já gravados são os primeiros.
         foreach (var m in season.Matches.Skip(savedMatches).Where(m => m.HomeGoals is not null))
         {
@@ -46,6 +49,11 @@ public sealed partial class GameDatabase
             {
                 Bind(insert, ("$r", g.Round), ("$i", g.Index), ("$m", g.Minute), ("$c", g.ClubId), ("$p", g.PlayerId));
                 insert.ExecuteNonQuery();
+            }
+            foreach (var c in cards[(m.Round, m.Index)])
+            {
+                Bind(insertCard, ("$r", c.Round), ("$i", c.Index), ("$m", c.Minute), ("$c", c.ClubId), ("$p", c.PlayerId), ("$k", CardKind(c.Type)));
+                insertCard.ExecuteNonQuery();
             }
         }
         tx.Commit();
@@ -92,13 +100,19 @@ public sealed partial class GameDatabase
             while (r.Read())
                 goals.Add(new(r.GetInt32(0), r.GetInt32(1), r.GetInt32(2), r.GetString(3), r.GetString(4)));
 
+        var cards = new List<SeasonCard>();
+        using (var cmd = Command("SELECT round, idx, minute, club_id, player_id, kind FROM season_card ORDER BY rowid"))
+        using (var r = cmd.ExecuteReader())
+            while (r.Read())
+                cards.Add(new(r.GetInt32(0), r.GetInt32(1), r.GetInt32(2), r.GetString(3), r.GetString(4), CardType(r.GetString(5))));
+
         var drawKeys = new Dictionary<string, int>();
         using (var cmd = Command("SELECT club_id, draw_key FROM season_club"))
         using (var r = cmd.ExecuteReader())
             while (r.Read())
                 drawKeys[r.GetString(0)] = r.GetInt32(1);
 
-        return Season.Restore(clubs, seed, config, matches, goals, drawKeys); // valida e lança InvalidDataException se corrompido
+        return Season.Restore(clubs, seed, config, matches, goals, drawKeys, cards); // valida e lança InvalidDataException se corrompido
     }
 
     private void InsertSeason(Season season, SqliteTransaction tx)
@@ -134,6 +148,22 @@ public sealed partial class GameDatabase
                 cmd.Parameters.AddWithValue(name, value ?? DBNull.Value);
         }
     }
+
+    private static string CardKind(MatchEventType type) => type switch
+    {
+        MatchEventType.YellowCard => "yellow",
+        MatchEventType.SecondYellow => "second_yellow",
+        MatchEventType.RedCard => "red",
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Não é cartão."),
+    };
+
+    private static MatchEventType CardType(string kind) => kind switch
+    {
+        "yellow" => MatchEventType.YellowCard,
+        "second_yellow" => MatchEventType.SecondYellow,
+        "red" => MatchEventType.RedCard,
+        _ => throw new FormatException($"Tipo de cartão desconhecido: '{kind}'."),
+    };
 
     private static string FormatDate(DateOnly d) => d.ToString(DateFormat, CultureInfo.InvariantCulture);
     private static DateOnly ParseDate(string s) => DateOnly.ParseExact(s, DateFormat, CultureInfo.InvariantCulture);

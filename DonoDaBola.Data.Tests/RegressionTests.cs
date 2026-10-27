@@ -3,7 +3,7 @@ using DonoDaBola.Core.Competition;
 namespace DonoDaBola.Data.Tests;
 
 // Tabela final da seed 42 com os 20 clubes do seed.json, gravada na main 6676904 (antes dos cartões).
-// É a mesma temporada do Sandbox (--temporada --seed 42) com a disciplina desligada.
+// Mesmos clubes e seed do Sandbox (--temporada --seed 42), mas com DisciplineRules.Off (o Sandbox usa Default).
 public class RegressionTests
 {
     public const string Season42 =
@@ -16,7 +16,7 @@ public class RegressionTests
     {
         using var db = GameDatabase.Open("Data Source=:memory:");
         SeedImporter.ImportDefault(db);
-        var season = Season.Create(db.GetAll(), 42);
+        var season = Season.Create(db.GetAll(), 42, discipline: DonoDaBola.Core.Simulation.DisciplineRules.Off);
         while (!season.IsFinished) season.AdvanceRound();
         Assert.Equal(Season42, string.Join(";", season.Table().Select(x => $"{x.Club.Id}:{x.Points}:{x.GoalsFor}:{x.GoalsAgainst}")));
     }

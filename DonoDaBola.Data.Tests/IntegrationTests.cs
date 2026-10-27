@@ -45,7 +45,7 @@ public sealed class IntegrationTests : IDisposable
         // Compara por projeção (o record Club compara o elenco por referência).
         var again = MatchEngine.Simulate(reopened.Get("clu01")!, reopened.Get("clu02")!, new Random(42));
         static object Shape(MatchResult r) =>
-            (r.HomeGoals, r.AwayGoals, string.Join(";", r.Events.Select(e => $"{e.Minute}{e.Type}{e.Player.Id}{e.Goalkeeper.Id}")));
+            (r.HomeGoals, r.AwayGoals, string.Join(";", r.Events.Select(e => $"{e.Minute}{e.Type}{e.Player.Id}{e.Goalkeeper?.Id}")));
         Assert.Equal(Shape(first), Shape(again));
     }
 }
