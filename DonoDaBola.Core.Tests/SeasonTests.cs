@@ -102,8 +102,10 @@ public class SeasonTests
         Assert.Equal(2, season.CurrentRound);
 
         // Cada jogo usa a própria seed derivada: dá para refazer um jogo isolado.
-        var again = MatchEngine.Simulate(round[4].Home, round[4].Away, new Random(Season.MatchSeed(3, 1, 4)));
-        Assert.Equal(results[4].Events.Count, again.Events.Count);
+        var seed = Season.MatchSeed(3, 1, 4);
+        var again = MatchEngine.Simulate(round[4].Home, round[4].Away, new Random(seed),
+            new MatchOptions { Discipline = DisciplineRules.Default, Cards = new Random(Season.SubSeed(seed, 1)) });
+        Assert.Equal(results[4].Events, again.Events);
     }
 
     [Fact]
@@ -153,13 +155,15 @@ public class SeasonTests
         var straight = Play(11);
 
         var half = Play(11, rounds: 19);
-        var resumed = Season.Restore(League, half.Seed, half.Config, half.Matches, half.Goals, half.DrawKeys);
+        var resumed = Season.Restore(League, half.Seed, half.Config, half.Matches, half.Goals, half.DrawKeys, half.Cards);
         Assert.Equal(20, resumed.CurrentRound);
         Assert.Equal(Shape(half), Shape(resumed)); // sorteio estável: mesma ordem depois de restaurar
         while (!resumed.IsFinished) resumed.AdvanceRound();
 
         Assert.Equal(Shape(straight), Shape(resumed));
         Assert.Equal(straight.TopScorers(10).Select(s => (s.Player.Id, s.Goals)), resumed.TopScorers(10).Select(s => (s.Player.Id, s.Goals)));
+        Assert.Equal(straight.Cards, resumed.Cards); // mesmos cartões e, por eles, as mesmas suspensões
+        Assert.NotEmpty(straight.Cards);
     }
 
     [Fact]
@@ -185,6 +189,24 @@ public class SeasonTests
         var keys = s.DrawKeys.ToDictionary();
         keys[keys.Keys.First()] = keys.Values.Last();
         Assert.Throws<InvalidDataException>(() => Restore(keys: keys));
+        // cartões inválidos: fora do elenco, clube que não jogou o jogo, jogo não disputado, fora do calendário,
+        // minuto fora da partida e evento que não é cartão
+        var y = MatchEventType.YellowCard;
+        var m0 = s.Matches[0];
+        var stranger = s.Matches.First(m => m.Home.Id != m0.Home.Id && m.Away.Id != m0.Home.Id).Home.Squad[0].Id;
+        foreach (var bad in new SeasonCard[]
+        {
+            new(1, 0, 10, m0.Home.Id, stranger, y),
+            new(1, 0, 10, s.Matches[1].Home.Id, s.Matches[1].Home.Squad[0].Id, y),
+            new(3, 0, 10, s.Matches[20].Home.Id, s.Matches[20].Home.Squad[0].Id, y),
+            new(39, 0, 10, m0.Home.Id, m0.Home.Squad[0].Id, y),
+            new(1, 10, 10, m0.Home.Id, m0.Home.Squad[0].Id, y),
+            new(1, 0, 91, m0.Home.Id, m0.Home.Squad[0].Id, y),
+            new(1, 0, 10, m0.Home.Id, m0.Home.Squad[0].Id, MatchEventType.Goal),
+        })
+            Assert.Throws<InvalidDataException>(() => Season.Restore(League, s.Seed, s.Config, s.Matches, s.Goals, s.DrawKeys.ToDictionary(), [bad]));
+        Season.Restore(League, s.Seed, s.Config, s.Matches, s.Goals, s.DrawKeys.ToDictionary(), [new(1, 0, 10, m0.Home.Id, m0.Home.Squad[0].Id, y)]);
+
         // gol de jogador que não é do clube
         Assert.Throws<InvalidDataException>(() => Restore(goals: s.Goals.Append(new SeasonGoal(1, 0, 10, "clu01", "clu02-p01"))));
     }

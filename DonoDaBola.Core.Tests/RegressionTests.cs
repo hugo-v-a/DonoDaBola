@@ -5,7 +5,8 @@ using DonoDaBola.Core.Simulation;
 namespace DonoDaBola.Core.Tests;
 
 // Referência gravada na main 6676904, antes dos cartões: placar e gols (minuto:jogador) de 20 partidas e a
-// tabela final da seed 42. Com a disciplina desligada e estado neutro, o motor tem de repetir tudo exatamente.
+// tabela final da seed 42. Com a disciplina desligada (DisciplineRules.Off) e estado neutro, o motor tem de repetir
+// tudo exatamente: pela sobrecarga antiga e pela nova (DisciplineTests).
 // Se um teste daqui quebrar, a simulação mudou: só atualize os valores com a mudança explicada no PR.
 public class RegressionTests
 {
@@ -57,8 +58,9 @@ public class RegressionTests
     [Fact]
     public void Season42_SameAsReference()
     {
-        var season = Season.Create(League, 42);
+        var season = Season.Create(League, 42, discipline: DisciplineRules.Off);
         while (!season.IsFinished) season.AdvanceRound();
         Assert.Equal(Season42, Table(season));
+        Assert.Empty(season.Cards);
     }
 }
