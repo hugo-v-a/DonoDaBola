@@ -10,7 +10,7 @@ public record SeasonGoal(int Round, int Index, int Minute, string ClubId, string
 
 public record TopScorer(Player Player, Club Club, int Goals);
 
-// Série A em memória: calendário, resultados, gols, sorteio de desempate e relógio do jogo.
+// Série A em memória: calendário, resultados, gols, cartões, sorteio de desempate e relógio do jogo.
 // A interface lê pela ISeasonView; quem controla o jogo avança com AdvanceRound().
 public sealed class Season : ISeasonView
 {
@@ -20,9 +20,10 @@ public sealed class Season : ISeasonView
     private readonly Dictionary<string, Club> _clubs;
     private readonly SeasonMatch[] _matches; // ordenados por rodada e índice: o jogo i da rodada r fica em (r-1)*10+i
     private readonly List<SeasonGoal> _goals;
+    private readonly List<SeasonCard> _cards;
 
     private Season(IReadOnlyList<Club> clubs, int seed, SeasonConfig config, IEnumerable<SeasonMatch> matches,
-        IEnumerable<SeasonGoal> goals, IReadOnlyDictionary<string, int> drawKeys)
+        IEnumerable<SeasonGoal> goals, IReadOnlyDictionary<string, int> drawKeys, IEnumerable<SeasonCard> cards, DisciplineRules discipline)
     {
         _clubs = clubs.ToDictionary(c => c.Id);
         if (_clubs.Count != ClubCount)
@@ -30,6 +31,8 @@ public sealed class Season : ISeasonView
         (Seed, Config) = (seed, config);
         _matches = matches.OrderBy(m => m.Round).ThenBy(m => m.Index).ToArray();
         _goals = goals.ToList();
+        _cards = cards.ToList();
+        Discipline = discipline;
         DrawKeys = new Dictionary<string, int>(drawKeys);
 
         // Restore recebe dados do save: tudo é conferido aqui, para nenhum erro aparecer só na hora de ler a tabela.
@@ -43,6 +46,11 @@ public sealed class Season : ISeasonView
             throw new InvalidDataException("Temporada corrompida: as chaves de sorteio precisam ser uma por clube, sem repetição.");
         if (_goals.Any(g => !_clubs.TryGetValue(g.ClubId, out var c) || c.Squad.All(p => p.Id != g.PlayerId)))
             throw new InvalidDataException("Temporada corrompida: gol de jogador fora do elenco do clube.");
+        if (_cards.Any(c => !Competition.Discipline.IsCard(c.Type) || c.Minute is < 1 or > MatchEngine.Minutes
+                || !_clubs.TryGetValue(c.ClubId, out var club) || club.Squad.All(p => p.Id != c.PlayerId)
+                || c.Round < 1 || c.Round > SeasonConfig.Rounds || c.Index is < 0 or >= MatchesPerRound
+                || _matches[(c.Round - 1) * MatchesPerRound + c.Index] is var m && (m.HomeGoals is null || (m.Home.Id != c.ClubId && m.Away.Id != c.ClubId))))
+            throw new InvalidDataException("Temporada corrompida: cartão inválido, de jogador fora do elenco ou de jogo não disputado.");
         // A rodada atual é a primeira sem placar; rodada pela metade (ou fora de ordem) é dado corrompido.
         var played = _matches.Count(m => m.HomeGoals is not null);
         if (played % MatchesPerRound != 0 || _matches.Take(played).Any(m => m.HomeGoals is null))
@@ -55,6 +63,8 @@ public sealed class Season : ISeasonView
     public IReadOnlyDictionary<string, int> DrawKeys { get; }
     public IReadOnlyList<SeasonMatch> Matches => _matches;
     public IReadOnlyList<SeasonGoal> Goals => _goals;
+    public IReadOnlyList<SeasonCard> Cards => _cards;
+    public DisciplineRules Discipline { get; }  // não é gravada: vale a do jogo que carrega o save
 
     public int CurrentRound { get; private set; }
     public bool IsFinished => CurrentRound > SeasonConfig.Rounds;
@@ -75,7 +85,32 @@ public sealed class Season : ISeasonView
             ? _matches.Where(m => m.Home.Id == clubId || m.Away.Id == clubId).ToList()
             : throw new ArgumentException($"Clube '{clubId}' não está na temporada.", nameof(clubId));
 
-    public IReadOnlyList<StandingRow> Table() => Standings.Compute(_clubs.Values, _matches, DrawKeys);
+    public IReadOnlyList<StandingRow> Table() => Standings.Compute(_clubs.Values, _matches, DrawKeys, _cards, Discipline);
+
+    // Suspensos do clube na rodada atual (os que não podem jogar a próxima rodada). Com a temporada encerrada,
+    // nenhum: a suspensão não passa para a temporada seguinte (decisão até o M3, ADR 0005).
+    public IReadOnlyList<Unavailable> UnavailableOf(string clubId)
+    {
+        if (!_clubs.TryGetValue(clubId, out var club))
+            throw new ArgumentException($"Clube '{clubId}' não está na temporada.", nameof(clubId));
+        if (IsFinished)
+            return [];
+        var back = Competition.Discipline.ReturnRounds(Competition.Discipline.Suspensions(_cards, Discipline), CurrentRound);
+        return club.Squad.Where(p => back.ContainsKey(p.Id))
+            .Select(p => new Unavailable(p, UnavailableReason.Suspended, back[p.Id]))
+            .ToList();
+    }
+
+    // Por clube: menos vermelhos e depois menos amarelos primeiro (contagem do desempate); empate pelo id.
+    public IReadOnlyList<DisciplineRow> DisciplineTable()
+    {
+        var suspensions = Competition.Discipline.Suspensions(_cards, Discipline);
+        return _clubs.Values
+            .Select(c => (Club: c, Cards: Competition.Discipline.TieBreakCards(_cards, c.Id, Discipline)))
+            .Select(x => new DisciplineRow(x.Club, x.Cards.Yellows, x.Cards.Reds, suspensions.Count(s => s.ClubId == x.Club.Id)))
+            .OrderBy(r => r.Reds).ThenBy(r => r.Yellows).ThenBy(r => r.Club.Id, StringComparer.Ordinal)
+            .ToList();
+    }
 
     // Mais gols primeiro; empate pelo id do jogador, para a ordem não variar.
     // ponytail: soma por (clube, jogador) e procura no elenco atual; com o mercado (M3), somar por jogador e
@@ -91,7 +126,7 @@ public sealed class Season : ISeasonView
             .ToList();
     }
 
-    public static Season Create(IReadOnlyList<Club> clubs, int seed, SeasonConfig? config = null)
+    public static Season Create(IReadOnlyList<Club> clubs, int seed, SeasonConfig? config = null, DisciplineRules? discipline = null)
     {
         config ??= SeasonConfig.Default;
         var random = new Random(seed);
@@ -105,28 +140,45 @@ public sealed class Season : ISeasonView
         var byId = clubs.ToDictionary(c => c.Id);
         var matches = Schedule.Generate(ids, random)
             .Select(f => new SeasonMatch(f.Round, f.Index, config.DateOf(f.Round), byId[f.HomeId], byId[f.AwayId], null, null));
-        return new Season(clubs, seed, config, matches, [], drawKeys);
+        return new Season(clubs, seed, config, matches, [], drawKeys, [], discipline ?? DisciplineRules.Default);
     }
 
     // Remonta uma temporada salva (Data). Rodada pela metade lança InvalidDataException.
+    // Sem cartões (save da v2), a temporada continua sem suspensões até os próximos cartões.
     public static Season Restore(IReadOnlyList<Club> clubs, int seed, SeasonConfig config, IEnumerable<SeasonMatch> matches,
-        IEnumerable<SeasonGoal> goals, IReadOnlyDictionary<string, int> drawKeys) =>
-        new(clubs, seed, config, matches, goals, drawKeys);
+        IEnumerable<SeasonGoal> goals, IReadOnlyDictionary<string, int> drawKeys, IEnumerable<SeasonCard>? cards = null, DisciplineRules? discipline = null) =>
+        new(clubs, seed, config, matches, goals, drawKeys, cards ?? [], discipline ?? DisciplineRules.Default);
 
     // Seed de cada jogo: aritmética fixa (HashCode.Combine muda a cada execução), para a temporada ser
     // reprodutível e retomável. Mudar a fórmula muda os jogos de todo save; o teste MatchSeed_ReferenceValue avisa.
     public static int MatchSeed(int seasonSeed, int round, int index) => unchecked(seasonSeed * 1_000_003 + round * 1_009 + index);
 
+    // Sequências separadas da seed do jogo (1 = cartões; 2 e 3 reservadas para lesões no M2): não mexem nos gols.
+    public static int SubSeed(int matchSeed, int stream) => unchecked(matchSeed * 31 + stream * 7_919);
+
     // Simula os 10 jogos da rodada atual e devolve os resultados completos (com eventos, para a narração).
-    // A temporada guarda só o placar e os gols. Tudo é calculado antes de gravar: ou entra a rodada inteira, ou nada.
+    // A temporada guarda o placar, os gols e os cartões. Tudo é calculado antes de gravar: ou entra a rodada inteira, ou nada.
     public IReadOnlyList<MatchResult> AdvanceRound()
     {
         if (IsFinished)
             throw new InvalidOperationException($"A temporada terminou: as {SeasonConfig.Rounds} rodadas já foram jogadas.");
 
         var first = (CurrentRound - 1) * MatchesPerRound;
+        // Suspensos ficam fora da escalação desta rodada.
+        var suspended = Competition.Discipline.ReturnRounds(Competition.Discipline.Suspensions(_cards, Discipline), CurrentRound).Keys.ToHashSet();
         var results = Enumerable.Range(first, MatchesPerRound)
-            .Select(i => MatchEngine.Simulate(_matches[i].Home, _matches[i].Away, new Random(MatchSeed(Seed, _matches[i].Round, _matches[i].Index))))
+            .Select(i =>
+            {
+                var m = _matches[i];
+                var seed = MatchSeed(Seed, m.Round, m.Index);
+                return MatchEngine.Simulate(m.Home, m.Away, new Random(seed), new MatchOptions
+                {
+                    HomeLineup = Lineup.Pick442(m.Home, suspended),
+                    AwayLineup = Lineup.Pick442(m.Away, suspended),
+                    Discipline = Discipline,
+                    Cards = new Random(SubSeed(seed, 1)),
+                });
+            })
             .ToList();
 
         for (var i = 0; i < MatchesPerRound; i++)
@@ -135,6 +187,8 @@ public sealed class Season : ISeasonView
             _matches[first + i] = m with { HomeGoals = r.HomeGoals, AwayGoals = r.AwayGoals };
             _goals.AddRange(r.Events.Where(e => e.Type == MatchEventType.Goal)
                 .Select(e => new SeasonGoal(m.Round, m.Index, e.Minute, e.Club.Id, e.Player.Id)));
+            _cards.AddRange(r.Events.Where(e => Competition.Discipline.IsCard(e.Type))
+                .Select(e => new SeasonCard(m.Round, m.Index, e.Minute, e.Club.Id, e.Player.Id, e.Type)));
         }
         CurrentRound++;
         return results;

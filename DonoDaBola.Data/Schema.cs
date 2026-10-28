@@ -88,6 +88,19 @@ internal static class Schema
             FOREIGN KEY (round, idx) REFERENCES season_match(round, idx)
         ) STRICT;
         """,
+
+        // v3: cartões da temporada (só tabela nova). Suspensões e desempate saem deles: não há estado de disciplina.
+        """
+        CREATE TABLE season_card (
+            round      INTEGER NOT NULL,
+            idx        INTEGER NOT NULL,
+            minute     INTEGER NOT NULL CHECK (minute BETWEEN 1 AND 90),
+            club_id    TEXT NOT NULL REFERENCES club(id),
+            player_id  TEXT NOT NULL REFERENCES player(id),
+            kind       TEXT NOT NULL CHECK (kind IN ('yellow', 'second_yellow', 'red')),
+            FOREIGN KEY (round, idx) REFERENCES season_match(round, idx)
+        ) STRICT;
+        """,
     ];
 
     public static readonly string PlayerColumns =

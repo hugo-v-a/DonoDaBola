@@ -1,4 +1,5 @@
 using DonoDaBola.Core.Competition;
+using DonoDaBola.Core.Simulation;
 
 namespace DonoDaBola.Core.Tests;
 
@@ -18,9 +19,11 @@ public class StandingsTests
     private static SeasonMatch M(string home, string away, int? hg, int? ag, int round = 1) =>
         new(round, 0, new DateOnly(2026, 1, 28), Clubs[home], Clubs[away], hg, ag);
 
-    private static string[] Order(IEnumerable<SeasonMatch> matches, string[]? only = null, Dictionary<string, int>? keys = null) =>
-        Standings.Compute((only ?? ["a", "b", "c", "d"]).Select(id => Clubs[id]), matches.ToList(), keys ?? Keys)
+    private static string[] Order(IEnumerable<SeasonMatch> matches, string[]? only = null, Dictionary<string, int>? keys = null, IReadOnlyList<SeasonCard>? cards = null) =>
+        Standings.Compute((only ?? ["a", "b", "c", "d"]).Select(id => Clubs[id]), matches.ToList(), keys ?? Keys, cards)
             .Select(r => r.Club.Id).ToArray();
+
+    private static SeasonCard Card(string club, MatchEventType type, int round = 1) => new(round, 0, 30, club, $"{club}-x", type);
 
     [Fact]
     public void Points_ThreeOneZero_AndTotals()
@@ -125,11 +128,44 @@ public class StandingsTests
         Assert.Equal(["a", "b"], Order(matches, ["a", "b"]));
     }
 
+    // Tudo igual até o confronto direto (1 a 1 em casa e fora); o sorteio poria b à frente.
+    private static readonly SeasonMatch[] Level = [M("a", "b", 1, 1), M("b", "a", 1, 1, 2)];
+
+    [Fact]
+    public void Criterion5_FewerRedCards()
+    {
+        // b tem 1 vermelho (e menos amarelos que a): vermelhos vêm antes dos amarelos.
+        var cards = new[] { Card("b", MatchEventType.RedCard), Card("a", MatchEventType.YellowCard), Card("a", MatchEventType.YellowCard, 2) };
+        Assert.Equal(["a", "b"], Order(Level, ["a", "b"], cards: cards));
+    }
+
+    [Fact]
+    public void Criterion5_SecondYellowCountsAsRed()
+    {
+        var cards = new[] { Card("b", MatchEventType.YellowCard), Card("b", MatchEventType.SecondYellow), Card("a", MatchEventType.YellowCard), Card("a", MatchEventType.YellowCard, 2) };
+        Assert.Equal(["a", "b"], Order(Level, ["a", "b"], cards: cards));
+    }
+
+    [Fact]
+    public void Criterion6_FewerYellowCards()
+    {
+        var cards = new[] { Card("b", MatchEventType.YellowCard), Card("b", MatchEventType.YellowCard, 2), Card("a", MatchEventType.YellowCard) };
+        Assert.Equal(["a", "b"], Order(Level, ["a", "b"], cards: cards));
+    }
+
+    [Fact]
+    public void Cards_OfMatchesNotPlayed_DoNotCount()
+    {
+        // O cartão de b é de um jogo sem placar (dado inconsistente): não conta, e decide o sorteio (b à frente).
+        var matches = new[] { M("a", "b", 1, 1), M("b", "a", null, null, 2) };
+        Assert.Equal(["b", "a"], Order(matches, ["a", "b"], cards: [Card("b", MatchEventType.RedCard, 2)]));
+    }
+
     [Fact]
     public void TieBreakers_FollowRegulationOrder()
     {
         Assert.Equal(
-            ["Vitórias", "Saldo de gols", "Gols pró", "Confronto direto (pontos)", "Confronto direto (saldo)", "Sorteio"],
+            ["Vitórias", "Saldo de gols", "Gols pró", "Confronto direto (pontos)", "Confronto direto (saldo)", "Cartões vermelhos", "Cartões amarelos", "Sorteio"],
             Standings.TieBreakers.Select(t => t.Name));
     }
 

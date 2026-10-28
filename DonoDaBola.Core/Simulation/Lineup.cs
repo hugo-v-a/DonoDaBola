@@ -9,13 +9,22 @@ public record Lineup(
 {
     public IEnumerable<Player> Players => [Goalkeeper, .. Defenders, .. Midfielders, .. Forwards];
 
+    private static readonly HashSet<string> NoOne = [];
+
     // Escolhe os melhores por posição; se faltar gente numa posição, completa com o melhor restante nessa função.
-    public static Lineup Pick442(Club club)
+    public static Lineup Pick442(Club club) => Pick442(club, NoOne);
+
+    // Igual, sem os indisponíveis (ids de suspensos e lesionados). Sempre 11: se sobrarem menos de 11 disponíveis,
+    // completa com os indisponíveis do elenco, na ordem do elenco.
+    // ponytail: com elencos de 28 isso quase não acontece; revisar quando houver elencos curtos (mercado, M3).
+    public static Lineup Pick442(Club club, IReadOnlySet<string> unavailable)
     {
         if (club.Squad.Count < 11)
             throw new ArgumentException($"{club.Name} tem {club.Squad.Count} jogadores; são precisos 11.", nameof(club));
 
-        var available = club.Squad.ToList();
+        var available = club.Squad.Where(p => !unavailable.Contains(p.Id)).ToList();
+        if (available.Count < 11)
+            available.AddRange(club.Squad.Where(p => unavailable.Contains(p.Id)).Take(11 - available.Count));
         List<Player> Pick(Position position, int count)
         {
             var picked = available

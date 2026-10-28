@@ -7,7 +7,7 @@ namespace DonoDaBola.Data;
 // Uma conexão aberta durante toda a partida (o jogo é single-thread).
 public sealed partial class GameDatabase : IClubRepository, IPlayerRepository, ISeasonStore, IDisposable
 {
-    public const int SchemaVersion = 2;
+    public const int SchemaVersion = 3;
     public const int MaxPageSize = 200;
 
     internal SqliteConnection Connection { get; }

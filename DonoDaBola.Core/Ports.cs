@@ -33,6 +33,8 @@ public interface ISeasonView : IGameClock
     IReadOnlyList<Competition.SeasonMatch> MatchesOf(string clubId); // os 38 jogos do clube
     IReadOnlyList<Competition.StandingRow> Table();                  // ordenada, com desempate e zonas
     IReadOnlyList<Competition.TopScorer> TopScorers(int limit = 20);
+    IReadOnlyList<Competition.Unavailable> UnavailableOf(string clubId); // suspensos para a rodada atual, com a rodada de volta
+    IReadOnlyList<Competition.DisciplineRow> DisciplineTable();          // cartões e suspensões por clube
 }
 
 // Temporada guardada no banco (uma por jogo). SaveSeason grava só o que mudou, numa transação:

@@ -89,6 +89,21 @@ if (args.Contains("--temporada"))
         Console.WriteLine($"Média de gols por jogo: {table.Sum(r => r.GoalsFor) / (double)games:F2} ({games} jogos; esta execução levou {watch.Elapsed.TotalSeconds:F1} s)");
     if (persist && !season.IsFinished)
         Console.WriteLine($"Temporada salva no banco. Rode de novo com o mesmo --db para continuar da rodada {season.CurrentRound}.");
+    // Disciplina: médias por jogo SOMANDO os dois times (Brasileirão: cerca de 5,4 amarelos e 0,27 vermelho).
+    if (games > 0)
+    {
+        var cards = season.Cards;
+        var reds = cards.Count(c => c.Type is MatchEventType.RedCard or MatchEventType.SecondYellow);
+        var suspensions = Discipline.Suspensions(cards, season.Discipline);
+        var roundsPlayed = season.CurrentRound - 1;
+        // Rodadas de suspensão já cumpridas (até a última jogada), por clube e rodada.
+        var missed = suspensions.Sum(s => Math.Max(0, Math.Min(s.FromRound + s.Rounds, roundsPlayed + 1) - s.FromRound));
+        Console.WriteLine($"Cartões por jogo (os dois times): {cards.Count(c => c.Type == MatchEventType.YellowCard) / (double)games:F2} amarelos, {reds / (double)games:F2} vermelhos");
+        Console.WriteLine($"Indisponíveis por clube por rodada (suspensos): {missed / (double)(Season.ClubCount * roundsPlayed):F2}");
+        Console.WriteLine($"\n{"Clube",-5} {"Amarelos",8} {"Vermelhos",9} {"Suspensões",10} {"por amarelos",12}");
+        foreach (var d in season.DisciplineTable())
+            Console.WriteLine($"{d.Club.ShortName,-5} {d.Yellows,8} {d.Reds,9} {d.Suspensions,10} {suspensions.Count(s => s.ClubId == d.Club.Id && s.Reason == SuspensionReason.Yellows),12}");
+    }
     Console.WriteLine("Artilharia:");
     foreach (var s in season.TopScorers(5))
         Console.WriteLine($"  {s.Goals,2} gols  {s.Player.Name} ({s.Club.ShortName})");
@@ -105,7 +120,9 @@ if (clubs.Get(homeId) is not { } home)
 if (clubs.Get(awayId) is not { } away)
     return Fail($"Clube '{awayId}' não existe. Use --listar para ver os ids.");
 
-var result = MatchEngine.Simulate(home, away, new Random(seed));
+// Com cartões, como na temporada: sequência própria derivada da seed (não muda os gols).
+var result = MatchEngine.Simulate(home, away, new Random(seed),
+    new MatchOptions { Discipline = DisciplineRules.Default, Cards = new Random(Season.SubSeed(seed, 1)) });
 
 Console.WriteLine($"\n{home.Name} x {away.Name}  (seed {seed})");
 PrintLineup(home, result.HomeLineup);
@@ -128,11 +145,11 @@ if (!halfTimeShown)
 
 Console.WriteLine($"\nFim de jogo: {home.ShortName} {result.HomeGoals} x {result.AwayGoals} {away.ShortName}");
 // "No goleiro" = finalizações deste time defendidas pelo goleiro adversário.
-Console.WriteLine($"\n{"",-5} {"Finalizações",12} {"Gols",5} {"No goleiro",11} {"Para fora",10}");
+Console.WriteLine($"\n{"",-5} {"Finalizações",12} {"Gols",5} {"No goleiro",11} {"Para fora",10} {"Amarelos",9} {"Expulsões",10}");
 foreach (var club in new[] { home, away })
 {
     var mine = result.Events.Where(e => e.Club.Id == club.Id).ToList();
-    Console.WriteLine($"{club.ShortName,-5} {mine.Count,12} {Count(mine, MatchEventType.Goal),5} {Count(mine, MatchEventType.Save),11} {Count(mine, MatchEventType.Miss),10}");
+    Console.WriteLine($"{club.ShortName,-5} {mine.Count(e => e.IsShot),12} {Count(mine, MatchEventType.Goal),5} {Count(mine, MatchEventType.Save),11} {Count(mine, MatchEventType.Miss),10} {Count(mine, MatchEventType.YellowCard),9} {Count(mine, MatchEventType.SecondYellow) + Count(mine, MatchEventType.RedCard),10}");
 }
 return 0;
 
